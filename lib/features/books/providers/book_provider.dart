@@ -11,8 +11,44 @@ class BookProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  List<String> _availableGenres = [];
+  List<String> get availableGenres => _availableGenres;
+
+  List<String> _availableTraits = [];
+  List<String> get availableTraits => _availableTraits;
+
+  List<String> _availableRoles = [];
+  List<String> get availableRoles => _availableRoles;
+
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
+
+  Future<void> fetchAvailableGenres() async {
+    try {
+      _availableGenres = await _repository.getAllGenres();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading available genres: $e');
+    }
+  }
+
+  Future<void> fetchAvailableTraits() async {
+    try {
+      _availableTraits = await _repository.getAllTraits();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading available traits: $e');
+    }
+  }
+
+  Future<void> fetchAvailableRoles() async {
+    try {
+      _availableRoles = await _repository.getAllRoles();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading available roles: $e');
+    }
+  }
 
   Future<void> fetchBooks() async {
     _setLoading(true);
@@ -53,6 +89,46 @@ class BookProvider extends ChangeNotifier {
     } catch (e) {
       _errorMessage = 'Failed to add book details: $e';
       _setLoading(false);
+      return false;
+    }
+  }
+
+  Future<bool> updateBook(String id, Map<String, dynamic> updates, {List<String>? genres}) async {
+    try {
+      await _repository.updateBook(id, updates);
+      if (genres != null && genres.isNotEmpty) {
+        await _repository.addGenresToBook(id, genres);
+      }
+      final index = _books.indexWhere((b) => b.id == id);
+      if (index != -1) {
+        final old = _books[index];
+        _books[index] = BookModel(
+          id: old.id,
+          title: (updates['title'] as String?) ?? old.title,
+          author: (updates['author'] as String?) ?? old.author,
+          personalRating: updates.containsKey('personal_rating')
+              ? updates['personal_rating'] as int?
+              : old.personalRating,
+          personalReview: updates.containsKey('personal_review')
+              ? updates['personal_review'] as String?
+              : old.personalReview,
+          synopsis: updates.containsKey('synopsis')
+              ? updates['synopsis'] as String?
+              : old.synopsis,
+          coverUrl: updates.containsKey('cover_url')
+              ? updates['cover_url'] as String?
+              : old.coverUrl,
+          totalPages: (updates['total_pages'] as int?) ?? old.totalPages,
+          currentPage: (updates['current_page'] as int?) ?? old.currentPage,
+          addedBy: old.addedBy,
+          lastUpdatedBy: old.lastUpdatedBy,
+        );
+        notifyListeners();
+      }
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to update book: $e';
+      notifyListeners();
       return false;
     }
   }

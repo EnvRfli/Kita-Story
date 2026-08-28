@@ -3,7 +3,7 @@
 Welcome to the Kita Story project! When working on this codebase, you MUST adhere to the following rules:
 
 ## 1. Architecture & State Management
-- **Feature-First Clean Architecture**: Code is organized inside `lib/features/` by feature (e.g., `auth`, `books`). Each feature has `models`, `repositories`, `providers`, and `ui`.
+- **Feature-First Clean Architecture**: Code is organized inside `lib/features/` by feature (e.g., `auth`, `books`, `home`). Each feature has `models`, `repositories`, `providers`, `widgets`, and `ui`.
 - **State Management**: Use `Provider` (specifically `ChangeNotifierProvider` and `Consumer`). Avoid using `setState` for global data; use it only for ephemeral UI state (e.g., form inputs, bottom sheet selections).
 - **Backend**: Supabase. Do NOT use Firebase. Always fetch the client via `SupabaseNetwork.client`.
 - **Navigation**: Use `go_router` (`context.push`, `context.go`, `context.pop`). Do NOT use standard `Navigator`.

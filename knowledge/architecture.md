@@ -13,11 +13,20 @@ lib/
 │   └── utils/           # Helpers and formatters (`date_formatter.dart`)
 ├── features/
 │   ├── auth/            # Authentication & Gamification base module
-│   └── books/           # Book Tracker module
-│       ├── models/      # Data entities mapping to Supabase
-│       ├── providers/   # State management
-│       ├── repositories/# Supabase DB interactions
-│       └── ui/          # Flutter screens and bottom sheets
+│   │   ├── models/
+│   │   ├── providers/
+│   │   ├── repositories/
+│   │   ├── widgets/     # Auth-specific reusable widgets
+│   │   └── ui/
+│   ├── books/           # Book Tracker module
+│   │   ├── models/      # Data entities mapping to Supabase
+│   │   ├── providers/   # State management
+│   │   ├── repositories/# Supabase DB interactions
+│   │   ├── widgets/     # Reusable UI components & bottom sheets
+│   │   └── ui/          # Flutter screens
+│   └── home/            # Home dashboard module
+│       ├── widgets/     # Home components & cards
+│       └── ui/
 ```
 
 ## State Management (Provider)

@@ -11,7 +11,6 @@ class AppTheme {
         primary: AppColors.softPink,
         secondary: AppColors.softBlue,
         surface: Colors.white,
-        background: AppColors.background,
       ),
       textTheme: GoogleFonts.interTextTheme().copyWith(
         displayLarge: GoogleFonts.poppins(
@@ -72,14 +71,23 @@ class AppTheme {
           borderSide: const BorderSide(color: Colors.redAccent, width: 2),
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 4,
-        shadowColor: Colors.black.withOpacity(0.1),
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
         margin: const EdgeInsets.only(bottom: 16),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        dismissDirection: DismissDirection.horizontal,
+        backgroundColor: const Color(0xFF432835),
+        elevation: 6,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
       ),
     );
   }

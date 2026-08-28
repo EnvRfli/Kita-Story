@@ -36,13 +36,19 @@ lib/
 │   │   ├── models/
 │   │   ├── providers/
 │   │   ├── repositories/
+│   │   ├── widgets/     # Reusable custom widgets fitur auth
 │   │   └── ui/
 │   ├── books/           # Fitur Utama Fase 1
 │   │   ├── models/      # BookModel, CharacterModel, GenreModel
 │   │   ├── providers/   # BookProvider (memanggil repository)
 │   │   ├── repositories/# BookRepository (operasi CRUD ke Supabase)
+│   │   ├── widgets/     # Reusable widgets, cards, & bottom sheets buku
 │   │   └── ui/          # BookListScreen, BookDetailScreen, AddBookScreen
+│   ├── home/            # Fitur Halaman Utama
+│   │   ├── widgets/
+│   │   └── ui/
 │   └── leaderboard/     # Fitur Gamifikasi
+
 
 
 ## 5. Tema Design (Pastel Aesthetic)
@@ -125,7 +131,7 @@ CREATE TABLE book_notes (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. Dynamic Tags (Genres & Traits)
+-- 4. Dynamic Tags (Genres, Traits, Character Roles)
 CREATE TABLE genres (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT UNIQUE NOT NULL,
@@ -136,6 +142,13 @@ CREATE TABLE traits (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT UNIQUE NOT NULL,
   created_by UUID REFERENCES app_users(id)
+);
+
+CREATE TABLE character_roles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT UNIQUE NOT NULL,
+  created_by UUID REFERENCES app_users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 5. Pivot Table Buku <-> Genre
@@ -150,9 +163,10 @@ CREATE TABLE characters (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   book_id UUID REFERENCES books(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  description TEXT,
   photo_url TEXT,
   gender TEXT,
-  role TEXT CHECK (role IN ('Main', 'Side', 'Cameo')),
+  role TEXT,
   first_appearance_page INT,
   added_by UUID REFERENCES app_users(id)
 );
@@ -163,3 +177,28 @@ CREATE TABLE character_traits (
   trait_id UUID REFERENCES traits(id) ON DELETE CASCADE,
   PRIMARY KEY (character_id, trait_id)
 );
+
+-- 8. Book Snippets (Quotes & Memorable Moments)
+CREATE TABLE book_snippets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  book_id UUID REFERENCES books(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  caption TEXT,
+  page_number INT,
+  added_by UUID REFERENCES app_users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 9. Gamification & Activity Ledger
+CREATE TABLE user_point_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  activity_type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  points_earned INT NOT NULL,
+  reference_id UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_point_logs_created_at ON user_point_logs (created_at DESC);

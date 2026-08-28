@@ -12,11 +12,16 @@ class BookProgressInput extends StatelessWidget {
     this.onChanged,
   });
 
+  int get _currentPage => int.tryParse(currentPageController.text.trim()) ?? 0;
+  int get _totalPages => int.tryParse(totalPagesController.text.trim()) ?? 0;
+
+  bool get _hasOverflowError =>
+      _totalPages > 0 && _currentPage > _totalPages;
+  bool get _hasNegativeError => _currentPage < 0 || _totalPages < 0;
+
   double get _progress {
-    final cur = int.tryParse(currentPageController.text) ?? 0;
-    final total = int.tryParse(totalPagesController.text) ?? 0;
-    if (total <= 0) return 0.0;
-    return (cur / total).clamp(0.0, 1.0);
+    if (_totalPages <= 0) return 0.0;
+    return (_currentPage / _totalPages).clamp(0.0, 1.0);
   }
 
   @override
@@ -56,6 +61,7 @@ class BookProgressInput extends StatelessWidget {
                   title: 'Halaman Sekarang',
                   controller: currentPageController,
                   hint: '0',
+                  hasError: _hasOverflowError || _currentPage < 0,
                 ),
               ),
               Padding(
@@ -74,17 +80,58 @@ class BookProgressInput extends StatelessWidget {
                   title: 'Total Halaman',
                   controller: totalPagesController,
                   hint: '0',
+                  hasError: _totalPages < 0,
                 ),
               ),
             ],
           ),
+          if (_hasOverflowError) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    color: Color(0xFFD9534F), size: 14),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'Halaman sekarang ($_currentPage) melebihi total halaman ($_totalPages)',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFD9534F),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (_hasNegativeError) ...[
+            const SizedBox(height: 8),
+            const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Color(0xFFD9534F), size: 14),
+                SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'Nomor halaman tidak boleh kurang dari 0',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFD9534F),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: progress,
               backgroundColor: const Color(0xFFF3E8EC),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3B6B8A)),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(Color(0xFF3B6B8A)),
               minHeight: 8,
             ),
           ),
@@ -109,6 +156,7 @@ class BookProgressInput extends StatelessWidget {
     required String title,
     required TextEditingController controller,
     required String hint,
+    bool hasError = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,18 +186,34 @@ class BookProgressInput extends StatelessWidget {
             filled: true,
             fillColor: const Color(0xFFFAFAFA),
             isDense: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFEADBDF), width: 1),
+              borderSide: BorderSide(
+                color: hasError
+                    ? const Color(0xFFD9534F)
+                    : const Color(0xFFEADBDF),
+                width: 1,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFEADBDF), width: 1),
+              borderSide: BorderSide(
+                color: hasError
+                    ? const Color(0xFFD9534F)
+                    : const Color(0xFFEADBDF),
+                width: 1,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFF3B6B8A), width: 1.5),
+              borderSide: BorderSide(
+                color: hasError
+                    ? const Color(0xFFD9534F)
+                    : const Color(0xFF3B6B8A),
+                width: 1.5,
+              ),
             ),
           ),
         ),

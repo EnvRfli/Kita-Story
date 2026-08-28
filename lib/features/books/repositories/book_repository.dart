@@ -10,8 +10,43 @@ class BookRepository {
         .from('books')
         .select()
         .order('created_at', ascending: false);
-    
+
     return (data as List).map((json) => BookModel.fromJson(json)).toList();
+  }
+
+  Future<BookModel> getBookById(String id) async {
+    final data = await _client.from('books').select().eq('id', id).single();
+    return BookModel.fromJson(data);
+  }
+
+  Future<void> _recordActivityAndAddPoints({
+    required String userId,
+    required int points,
+    required String activityType,
+    required String title,
+    required String description,
+    String? referenceId,
+  }) async {
+    try {
+      await _client.rpc('record_activity_and_add_points', params: {
+        'p_user_id': userId,
+        'p_points': points,
+        'p_activity_type': activityType,
+        'p_title': title,
+        'p_description': description,
+        'p_reference_id': referenceId,
+      });
+    } catch (e) {
+      debugPrint('Info: RPC record_activity_and_add_points failed, using increment_points fallback: $e');
+      try {
+        await _client.rpc('increment_points', params: {
+          'user_id': userId,
+          'point_amount': points,
+        });
+      } catch (fallbackError) {
+        debugPrint('Warning: Failed to increment points: $fallbackError');
+      }
+    }
   }
 
   Future<BookModel> addBook(Map<String, dynamic> bookData) async {
@@ -22,10 +57,18 @@ class BookRepository {
     }
 
     final data = await _client.from('books').insert(bookData).select().single();
-    
-    // Increment points for gamification
+    final bookTitle = bookData['title'] as String? ?? 'Buku';
+
+    // Record activity & increment points (+10 pts)
     if (user != null) {
-      await _client.rpc('increment_points', params: {'user_id': user.id, 'point_amount': 10});
+      await _recordActivityAndAddPoints(
+        userId: user.id,
+        points: 10,
+        activityType: 'add_book',
+        title: 'Menambah Buku Baru 📖',
+        description: 'Menambahkan buku "$bookTitle" ke rak',
+        referenceId: data['id'] as String?,
+      );
     }
 
     return BookModel.fromJson(data);
@@ -38,9 +81,58 @@ class BookRepository {
     }
 
     await _client.from('books').update(updates).eq('id', id);
-    
+
     if (user != null) {
-      await _client.rpc('increment_points', params: {'user_id': user.id, 'point_amount': 5});
+      try {
+        final bookData = await _client
+            .from('books')
+            .select('title, total_pages, current_page')
+            .eq('id', id)
+            .single();
+        final bookTitle = bookData['title'] as String? ?? 'Buku';
+        final totalPages = bookData['total_pages'] as int? ?? 0;
+        final currentPage = updates['current_page'] as int? ?? (bookData['current_page'] as int? ?? 0);
+
+        if (totalPages > 0 && currentPage >= totalPages && updates['current_page'] != null) {
+          // Bonus finisher (+30 pts = 5 base + 25 bonus)
+          await _recordActivityAndAddPoints(
+            userId: user.id,
+            points: 30,
+            activityType: 'finish_book',
+            title: 'Menamatkan Buku 🏆',
+            description: 'Menyelesaikan membaca buku "$bookTitle"',
+            referenceId: id,
+          );
+        } else if (updates['current_page'] != null) {
+          await _recordActivityAndAddPoints(
+            userId: user.id,
+            points: 5,
+            activityType: 'update_progress',
+            title: 'Melanjutkan Membaca 🔖',
+            description: 'Mencapai halaman $currentPage pada buku "$bookTitle"',
+            referenceId: id,
+          );
+        } else {
+          await _recordActivityAndAddPoints(
+            userId: user.id,
+            points: 5,
+            activityType: 'edit_book',
+            title: 'Memperbarui Buku ✍️',
+            description: 'Memperbarui detail / review buku "$bookTitle"',
+            referenceId: id,
+          );
+        }
+      } catch (e) {
+        debugPrint('Error recording update activity: $e');
+        await _recordActivityAndAddPoints(
+          userId: user.id,
+          points: 5,
+          activityType: 'edit_book',
+          title: 'Memperbarui Buku ✍️',
+          description: 'Memperbarui aktivitas buku',
+          referenceId: id,
+        );
+      }
     }
   }
 
@@ -51,17 +143,21 @@ class BookRepository {
   Future<void> addGenresToBook(String bookId, List<String> genreNames) async {
     final user = _client.auth.currentUser;
     if (user == null || genreNames.isEmpty) return;
-    
+
     for (String name in genreNames) {
       try {
         // Upsert genre
-        final data = await _client.from('genres').upsert({
-          'name': name.toLowerCase().trim(),
-          'created_by': user.id,
-        }, onConflict: 'name').select('id').single();
-        
+        final data = await _client
+            .from('genres')
+            .upsert({
+              'name': name.toLowerCase().trim(),
+              'created_by': user.id,
+            }, onConflict: 'name')
+            .select('id')
+            .single();
+
         final genreId = data['id'];
-        
+
         // Link to book
         await _client.from('book_genres').upsert({
           'book_id': bookId,
@@ -73,7 +169,8 @@ class BookRepository {
     }
   }
 
-  Future<void> addBookNotes(String bookId, List<Map<String, dynamic>> notes) async {
+  Future<void> addBookNotes(
+      String bookId, List<Map<String, dynamic>> notes) async {
     final user = _client.auth.currentUser;
     if (user == null || notes.isEmpty) return;
 
@@ -85,9 +182,20 @@ class BookRepository {
         'added_by': user.id,
       });
     }
+
+    // Record activity & increment points (+3 pts per note)
+    await _recordActivityAndAddPoints(
+      userId: user.id,
+      points: 3 * notes.length,
+      activityType: 'add_note',
+      title: 'Menambah Catatan 📝',
+      description: 'Menambahkan ${notes.length} catatan baru pada buku',
+      referenceId: bookId,
+    );
   }
 
-  Future<void> addCharacters(String bookId, List<Map<String, dynamic>> characters) async {
+  Future<void> addCharacters(
+      String bookId, List<Map<String, dynamic>> characters) async {
     final user = _client.auth.currentUser;
     if (user == null || characters.isEmpty) return;
 
@@ -98,6 +206,171 @@ class BookRepository {
         'role': char['role'],
         'added_by': user.id,
       });
+    }
+  }
+
+  Future<List<String>> getAllGenres() async {
+    try {
+      final data = await _client
+          .from('genres')
+          .select('name')
+          .order('name', ascending: true);
+      return (data as List).map((e) => e['name'] as String).toList();
+    } catch (e) {
+      debugPrint('Error fetching all genres: $e');
+      return [];
+    }
+  }
+
+  Future<List<String>> getAllTraits() async {
+    try {
+      final data = await _client
+          .from('traits')
+          .select('name')
+          .order('name', ascending: true);
+      return (data as List).map((e) => e['name'] as String).toList();
+    } catch (e) {
+      debugPrint('Error fetching traits: $e');
+      return [];
+    }
+  }
+
+  Future<List<String>> getAllRoles() async {
+    try {
+      final data = await _client
+          .from('character_roles')
+          .select('name')
+          .order('name', ascending: true);
+      return (data as List).map((e) => e['name'] as String).toList();
+    } catch (e) {
+      debugPrint('Error fetching character roles: $e');
+      return ['Main', 'Side', 'Cameo', 'Antagonist', 'Supporting'];
+    }
+  }
+
+  Future<void> addRole(String roleName) async {
+    final user = _client.auth.currentUser;
+    if (user == null || roleName.trim().isEmpty) return;
+
+    try {
+      await _client.from('character_roles').upsert({
+        'name': roleName.trim(),
+        'created_by': user.id,
+      }, onConflict: 'name');
+    } catch (e) {
+      debugPrint('Error adding character role: $e');
+    }
+  }
+
+  Future<void> addCharacterWithDetails(
+    String bookId,
+    Map<String, dynamic> characterData,
+    List<String> traits,
+  ) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    // Upsert role if new
+    final role = characterData['role'] as String?;
+    if (role != null && role.trim().isNotEmpty) {
+      await addRole(role.trim());
+    }
+
+    characterData['book_id'] = bookId;
+    characterData['added_by'] = user.id;
+
+    final charResult = await _client
+        .from('characters')
+        .insert(characterData)
+        .select('id')
+        .single();
+
+    final characterId = charResult['id'] as String;
+
+    // Link traits
+    if (traits.isNotEmpty) {
+      for (var traitName in traits) {
+        try {
+          final traitResult = await _client
+              .from('traits')
+              .upsert({
+                'name': traitName.toLowerCase().trim(),
+                'created_by': user.id,
+              }, onConflict: 'name')
+              .select('id')
+              .single();
+
+          final traitId = traitResult['id'];
+
+          await _client.from('character_traits').upsert({
+            'character_id': characterId,
+            'trait_id': traitId,
+          });
+        } catch (e) {
+          debugPrint('Error linking trait $traitName: $e');
+        }
+      }
+    }
+
+    final charName = characterData['name'] as String? ?? 'Karakter';
+
+    // Record activity & increment points (+5 pts)
+    await _recordActivityAndAddPoints(
+      userId: user.id,
+      points: 5,
+      activityType: 'add_character',
+      title: 'Menambah Tokoh Karakter 🎭',
+      description: 'Mendaftarkan tokoh "$charName" pada buku',
+      referenceId: bookId,
+    );
+  }
+
+  Future<void> updateCharacterWithDetails(
+    String characterId,
+    Map<String, dynamic> characterData,
+    List<String> traits,
+  ) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    // Upsert role if new
+    final role = characterData['role'] as String?;
+    if (role != null && role.trim().isNotEmpty) {
+      await addRole(role.trim());
+    }
+
+    await _client
+        .from('characters')
+        .update(characterData)
+        .eq('id', characterId);
+
+    // Re-link traits
+    if (traits.isNotEmpty) {
+      await _client
+          .from('character_traits')
+          .delete()
+          .eq('character_id', characterId);
+      for (var traitName in traits) {
+        try {
+          final traitResult = await _client
+              .from('traits')
+              .upsert({
+                'name': traitName.toLowerCase().trim(),
+                'created_by': user.id,
+              }, onConflict: 'name')
+              .select('id')
+              .single();
+
+          final traitId = traitResult['id'];
+
+          await _client.from('character_traits').upsert({
+            'character_id': characterId,
+            'trait_id': traitId,
+          });
+        } catch (e) {
+          debugPrint('Error linking trait $traitName: $e');
+        }
+      }
     }
   }
 
@@ -132,11 +405,115 @@ class BookRepository {
     try {
       final data = await _client
           .from('characters')
-          .select()
+          .select('*, character_traits(traits(name))')
           .eq('book_id', bookId);
-      return List<Map<String, dynamic>>.from(data);
+
+      return (data as List).map((item) {
+        final map = Map<String, dynamic>.from(item);
+        final traitList = <String>[];
+        if (item['character_traits'] != null) {
+          for (var ct in item['character_traits']) {
+            if (ct['traits'] != null && ct['traits']['name'] != null) {
+              traitList.add(ct['traits']['name'] as String);
+            }
+          }
+        }
+        map['traits'] = traitList;
+        return map;
+      }).toList();
     } catch (e) {
       debugPrint('Error fetching characters: $e');
+      return [];
+    }
+  }
+
+  Future<void> deleteCharacter(String characterId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _client.from('characters').delete().eq('id', characterId);
+    } catch (e) {
+      debugPrint('Error deleting character: $e');
+      rethrow;
+    }
+  }
+
+  // --- Book Snippets (Quotes & Memorable Moments) ---
+
+  Future<List<Map<String, dynamic>>> getBookSnippets(String bookId) async {
+    try {
+      final data = await _client
+          .from('book_snippets')
+          .select()
+          .eq('book_id', bookId)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error fetching book snippets: $e');
+      return [];
+    }
+  }
+
+  Future<void> addBookSnippet(
+    String bookId, {
+    required String imageUrl,
+    String? caption,
+    int? pageNumber,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _client.from('book_snippets').insert({
+        'book_id': bookId,
+        'image_url': imageUrl,
+        'caption': caption,
+        'page_number': pageNumber,
+        'added_by': user.id,
+      });
+
+      // Record activity & increment points (+5 pts)
+      await _recordActivityAndAddPoints(
+        userId: user.id,
+        points: 5,
+        activityType: 'add_snippet',
+        title: 'Menambah Cuplikan Foto 📸',
+        description: pageNumber != null
+            ? 'Menyimpan cuplikan foto halaman $pageNumber'
+            : 'Menyimpan cuplikan foto / kutipan baru',
+        referenceId: bookId,
+      );
+    } catch (e) {
+      debugPrint('Error adding book snippet: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteBookSnippet(String snippetId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _client.from('book_snippets').delete().eq('id', snippetId);
+    } catch (e) {
+      debugPrint('Error deleting book snippet: $e');
+      rethrow;
+    }
+  }
+
+  // --- Point & Activity Logs ---
+
+  Future<List<Map<String, dynamic>>> getActivityLogs({int limit = 20}) async {
+    try {
+      final data = await _client
+          .from('user_point_logs')
+          .select('*, app_users(display_name, photo_url)')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('Error fetching activity logs: $e');
       return [];
     }
   }
