@@ -10,4 +10,37 @@ class AppColors {
   static const Color background = Color(0xFFFDFDFD);
   static const Color textPrimary = Color(0xFF333333);
   static const Color textSecondary = Color(0xFF757575);
+
+  // Gradient Biru (6155F5 -> 0284F6)
+  static const Color gradientBlueStart = Color(0xFF6155F5);
+  static const Color gradientBlueEnd = Color(0xFF0284F6);
+
+  static const LinearGradient gradientBiru = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [
+      Color(0xFF6155F5),
+      Color(0xFF0284F6),
+    ],
+  );
+
+  // Gradient Orange (FFCC00 -> F96E0D, atas kebawah)
+  static const LinearGradient gradientOrange = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFFFFCC00),
+      Color(0xFFF96E0D),
+    ],
+  );
+
+  // Gradient Partner Blue (0088FF -> 0775D5, kiri ke kanan)
+  static const LinearGradient gradientPartnerBlue = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [
+      Color(0xFF0088FF),
+      Color(0xFF0775D5),
+    ],
+  );
 }

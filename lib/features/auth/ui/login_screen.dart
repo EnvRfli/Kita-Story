@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -12,15 +13,108 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with TickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
+  late final AnimationController _transitionController;
+  late final AnimationController _idleController;
+
+  // Transition Animations
+  late final Animation<Offset> _logoSlideAnimation;
+  late final Animation<double> _logoScaleAnimation;
+  late final Animation<Offset> _cardSlideAnimation;
+  late final Animation<double> _cardFadeAnimation;
+
+  // Subtle Idle Floating for Corner Elements
+  late final Animation<double> _idleFloat1;
+  late final Animation<double> _idleFloat2;
+  late final Animation<double> _idleFloat3;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAnimations();
+  }
+
+  void _initAnimations() {
+    // 1. Transition Controller (Smooth 900ms push-up animation)
+    _transitionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+
+    // 2. Idle Controller for decorative corner breathing
+    _idleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+
+    // Logo slides upward smoothly (from center position to top)
+    _logoSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.45),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _transitionController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    _logoScaleAnimation = Tween<double>(
+      begin: 1.12,
+      end: 1.0,
+    ).animate(
+      CurvedAnimation(
+        parent: _transitionController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    // Login Card slides up from bottom with spring fade
+    _cardSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.4),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _transitionController,
+        curve: const Interval(0.15, 1.0, curve: Curves.easeOutBack),
+      ),
+    );
+
+    _cardFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(
+      CurvedAnimation(
+        parent: _transitionController,
+        curve: const Interval(0.1, 0.7, curve: Curves.easeIn),
+      ),
+    );
+
+    // Corner idle floats
+    _idleFloat1 = Tween<double>(begin: -5.0, end: 5.0).animate(
+      CurvedAnimation(parent: _idleController, curve: Curves.easeInOutSine),
+    );
+    _idleFloat2 = Tween<double>(begin: 5.0, end: -5.0).animate(
+      CurvedAnimation(parent: _idleController, curve: Curves.easeInOutSine),
+    );
+    _idleFloat3 = Tween<double>(begin: -6.0, end: 6.0).animate(
+      CurvedAnimation(parent: _idleController, curve: Curves.easeInOutSine),
+    );
+
+    // Trigger entrance animation
+    _transitionController.forward();
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _transitionController.dispose();
+    _idleController.dispose();
     super.dispose();
   }
 
@@ -58,362 +152,330 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFFF6F8),
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          // 1. Dreamy Decorative Pastel Blobs Background
-          Positioned(
-            top: -60,
-            right: -60,
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFFFDDE6).withValues(alpha: 0.55),
-              ),
-            ),
-          ),
-          Positioned(
-            top: size.height * 0.4,
-            left: -80,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFE2EDF4).withValues(alpha: 0.6),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -50,
-            right: -30,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFFBE4EC).withValues(alpha: 0.5),
+          // 1. Background Image
+          Image.asset(
+            'lib/assets/background/Loading Screen.png',
+            fit: BoxFit.cover,
+            width: size.width,
+            height: size.height,
+            errorBuilder: (context, error, stackTrace) => Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFFFEFF3),
+                    Color(0xFFFFF9E6),
+                    Color(0xFFE8F5E9),
+                    Color(0xFFE3F2FD),
+                  ],
+                ),
               ),
             ),
           ),
 
-          // 2. Main Login Content
+          // 2. Top-Left Component (Yellow/Orange Noodle - 9785753 3.png)
+          Positioned(
+            top: -size.height * 0.06,
+            left: -size.width * 0.20,
+            child: AnimatedBuilder(
+              animation: _idleController,
+              builder: (context, child) {
+                final idleY = _idleFloat1.value;
+                final idleX = math.sin(_idleController.value * math.pi) * 3;
+                return Transform.translate(
+                  offset: Offset(idleX, idleY),
+                  child: child,
+                );
+              },
+              child: Image.asset(
+                'lib/assets/tai/9785753 3.png',
+                width: size.width * 0.62,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+
+          // 3. Top-Right Component (Purple/Red Noodle - 9785753 6.png)
+          Positioned(
+            top: -size.height * 0.065,
+            right: -size.width * 0.22,
+            child: AnimatedBuilder(
+              animation: _idleController,
+              builder: (context, child) {
+                final idleY = _idleFloat2.value;
+                final idleX = -math.sin(_idleController.value * math.pi) * 3;
+                return Transform.translate(
+                  offset: Offset(idleX, idleY),
+                  child: child,
+                );
+              },
+              child: Image.asset(
+                'lib/assets/tai/9785753 6.png',
+                width: size.width * 0.70,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+
+          // 4. Bottom-Right Component (Blue/Purple Noodle - 9785753 5.png)
+          Positioned(
+            bottom: -size.height * 0.16,
+            right: -size.width * 0.27,
+            child: AnimatedBuilder(
+              animation: _idleController,
+              builder: (context, child) {
+                final idleY = _idleFloat3.value;
+                final idleX = math.cos(_idleController.value * math.pi) * 3;
+                return Transform.translate(
+                  offset: Offset(idleX, idleY),
+                  child: child,
+                );
+              },
+              child: Image.asset(
+                'lib/assets/tai/9785753 5.png',
+                width: size.width * 0.82,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+
+          // 5. Main Scrollable Content (Logo + Form Card)
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0, vertical: 20.0),
+                  horizontal: 24.0,
+                  vertical: 20.0,
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Branding / Logo Header
-                    _buildLogoHeader(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 12),
 
-                    // Elegant Glassmorphism Card
-                    Container(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 26,
-                        vertical: 32,
+                    // App Logo (Slides upward when login screen loads)
+                    AnimatedBuilder(
+                      animation: _transitionController,
+                      builder: (context, child) {
+                        return SlideTransition(
+                          position: _logoSlideAnimation,
+                          child: Transform.scale(
+                            scale: _logoScaleAnimation.value,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Image.asset(
+                        'lib/assets/logo/Group 9.png',
+                        width: size.width * 0.75,
+                        fit: BoxFit.contain,
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(
-                          color: const Color(0xFFF3E4EA),
-                          width: 1.5,
+                    ),
+                    const SizedBox(height: 48),
+
+                    // Translucent Frosted Glassmorphism Login Card (Pushed from bottom)
+                    AnimatedBuilder(
+                      animation: _transitionController,
+                      builder: (context, child) {
+                        return SlideTransition(
+                          position: _cardSlideAnimation,
+                          child: FadeTransition(
+                            opacity: _cardFadeAnimation,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 26,
+                          vertical: 32,
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                const Color(0xFF6B4454).withValues(alpha: 0.08),
-                            blurRadius: 28,
-                            offset: const Offset(0, 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(32),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            width: 1.8,
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Text(
-                            'Selamat Datang Kembali',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF6B4454),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6B4454)
+                                  .withValues(alpha: 0.06),
+                              blurRadius: 30,
+                              offset: const Offset(0, 10),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Masuk untuk melanjutkan kisah dan hari-hari kita.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 28),
-
-                          // Email Field
-                          _buildFieldLabel('Email Akun'),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF6B4454),
-                            ),
-                            decoration: _buildInputDecoration(
-                              hint: 'nama@email.com',
-                              icon: Icons.alternate_email_rounded,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-
-                          // Password Field
-                          _buildFieldLabel('Kata Sandi'),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _submit(),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF6B4454),
-                            ),
-                            decoration: _buildInputDecoration(
-                              hint: '••••••••',
-                              icon: Icons.lock_outline_rounded,
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: const Color(0xFF6B4454)
-                                      .withValues(alpha: 0.7),
-                                  size: 20,
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Card Title with GradientBiru Shader
+                            ShaderMask(
+                              shaderCallback: (bounds) =>
+                                  AppColors.gradientBiru.createShader(
+                                Rect.fromLTWH(
+                                    0, 0, bounds.width, bounds.height),
+                              ),
+                              child: const Text(
+                                'Selamat Datang',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: -0.5,
                                 ),
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 28),
+                            const SizedBox(height: 6),
 
-                          // Submit Button
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF3B6B8A),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
+                            // Card Subtitle
+                            const Text(
+                              'Silahkan masukkan email dan kata sandi\nuntuk masuk',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF555555),
+                                height: 1.35,
+                                fontWeight: FontWeight.w400,
                               ),
-                              elevation: 3,
-                              shadowColor: const Color(0xFF3B6B8A)
-                                  .withValues(alpha: 0.35),
                             ),
-                            onPressed: authProvider.isLoading ? null : _submit,
-                            child: authProvider.isLoading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'Masuk ke Kita Story',
+                            const SizedBox(height: 26),
+
+                            // Email Field
+                            TextField(
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF333333),
+                              ),
+                              decoration: _buildInputDecoration(
+                                hint: 'Email',
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Password Field
+                            TextField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _submit(),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF333333),
+                              ),
+                              decoration: _buildInputDecoration(
+                                hint: 'Kata Sandi',
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: const Color(0xFF555555),
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Submit Button with GradientBiru
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: AppColors.gradientBiru,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF6155F5)
+                                        .withValues(alpha: 0.35),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                onPressed:
+                                    authProvider.isLoading ? null : _submit,
+                                child: authProvider.isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                            Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Masuk',
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 15,
+                                          fontSize: 16,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                      SizedBox(width: 8),
-                                      Icon(
-                                        Icons.arrow_forward_rounded,
-                                        color: Colors.white,
-                                        size: 18,
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 28),
-
-                    // Private Space Badge (Footnote)
-                    _buildPrivateFootnote(),
                   ],
                 ),
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildLogoHeader() {
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.topRight,
-          children: [
-            Container(
-              height: 84,
-              width: 84,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFFFFEFF3),
-                    Color(0xFFEADBDF),
-                  ],
-                ),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white,
-                  width: 3,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF6B4454).withValues(alpha: 0.12),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.auto_stories_rounded,
-                  color: Color(0xFF6B4454),
-                  size: 42,
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(5),
-              decoration: const BoxDecoration(
-                color: Color(0xFF3B6B8A),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.favorite_rounded,
-                color: Colors.white,
-                size: 14,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          'Kita Story',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF6B4454),
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 2),
-        const Text(
-          'Ruang Cerita & Catatan Harian Kita ✨',
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFieldLabel(String label) {
-    return Text(
-      label,
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: Color(0xFF6B4454),
       ),
     );
   }
 
   InputDecoration _buildInputDecoration({
     required String hint,
-    required IconData icon,
     Widget? suffixIcon,
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: Colors.black26, fontSize: 13),
-      prefixIcon: Icon(icon, color: const Color(0xFF6B4454), size: 18),
+      hintStyle: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13.5),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: const Color(0xFFFAFAFA),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      fillColor: Colors.white.withValues(alpha: 0.85),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFEADBDF), width: 1),
+        borderSide: const BorderSide(color: Color(0xFFE2E4EB), width: 1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFEADBDF), width: 1),
+        borderSide: const BorderSide(color: Color(0xFFE2E4EB), width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF3B6B8A), width: 1.8),
-      ),
-    );
-  }
-
-  Widget _buildPrivateFootnote() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFF3E4EA),
-          width: 1,
-        ),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.lock_rounded,
-            size: 13,
-            color: Color(0xFF6B4454),
-          ),
-          SizedBox(width: 6),
-          Text(
-            'Private Couple Space • Kisah Kita Berdua 💕',
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF6B4454),
-            ),
-          ),
-        ],
+        borderSide: const BorderSide(color: Color(0xFF6155F5), width: 1.8),
       ),
     );
   }

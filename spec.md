@@ -102,6 +102,8 @@ CREATE TABLE app_users (
   password_hash TEXT NOT NULL,
   birthdate DATE,
   points INT DEFAULT 0,
+  photo_url TEXT,
+  partner_id UUID REFERENCES app_users(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
