@@ -4,7 +4,7 @@ import '../repositories/book_repository.dart';
 
 class BookProvider extends ChangeNotifier {
   final BookRepository _repository = BookRepository();
-  
+
   List<BookModel> _books = [];
   List<BookModel> get books => _books;
 
@@ -70,7 +70,7 @@ class BookProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       final newBook = await _repository.addBook(bookData);
-      
+
       // Atomic-like extended data saving
       if (genres.isNotEmpty) {
         await _repository.addGenresToBook(newBook.id, genres);
@@ -93,11 +93,12 @@ class BookProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateBook(String id, Map<String, dynamic> updates, {List<String>? genres}) async {
+  Future<bool> updateBook(String id, Map<String, dynamic> updates,
+      {List<String>? genres}) async {
     try {
       await _repository.updateBook(id, updates);
-      if (genres != null && genres.isNotEmpty) {
-        await _repository.addGenresToBook(id, genres);
+      if (genres != null) {
+        await _repository.updateBookGenres(id, genres);
       }
       final index = _books.indexWhere((b) => b.id == id);
       if (index != -1) {
@@ -157,6 +158,19 @@ class BookProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _errorMessage = 'Failed to update progress: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteBook(String id) async {
+    try {
+      await _repository.deleteBook(id);
+      _books.removeWhere((b) => b.id == id);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to delete book: $e';
       notifyListeners();
       return false;
     }

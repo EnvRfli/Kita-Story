@@ -56,7 +56,8 @@ class BookCard extends StatelessWidget {
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) =>
                               const Center(
-                            child: Icon(Icons.menu_book, color: AppColors.softBlue, size: 28),
+                            child: Icon(Icons.menu_book,
+                                color: AppColors.softBlue, size: 28),
                           ),
                         ),
                       )

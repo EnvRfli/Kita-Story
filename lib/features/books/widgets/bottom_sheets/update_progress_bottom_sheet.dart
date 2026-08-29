@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
 
 class UpdateProgressBottomSheet extends StatefulWidget {
   final int initialPage;
@@ -22,11 +21,9 @@ class UpdateProgressBottomSheet extends StatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
-      enableDrag: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => UpdateProgressBottomSheet(
         initialPage: initialPage,
@@ -49,7 +46,9 @@ class _UpdateProgressBottomSheetState extends State<UpdateProgressBottomSheet> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialPage.toString());
+    _controller = TextEditingController(
+      text: widget.initialPage > 0 ? widget.initialPage.toString() : '',
+    );
   }
 
   @override
@@ -59,6 +58,12 @@ class _UpdateProgressBottomSheetState extends State<UpdateProgressBottomSheet> {
   }
 
   void _validateInput(String value) {
+    if (value.trim().isEmpty) {
+      if (_errorMessage != null) {
+        setState(() => _errorMessage = null);
+      }
+      return;
+    }
     final page = int.tryParse(value.trim());
     if (page == null) {
       setState(() => _errorMessage = 'Masukkan angka halaman yang valid');
@@ -66,7 +71,7 @@ class _UpdateProgressBottomSheetState extends State<UpdateProgressBottomSheet> {
       setState(() => _errorMessage = 'Halaman tidak boleh kurang dari 0');
     } else if (widget.totalPages > 0 && page > widget.totalPages) {
       setState(() => _errorMessage =
-          'Halaman ($page) tidak boleh melebihi total halaman (${widget.totalPages})');
+          'Halaman tidak boleh melebihi total halaman (${widget.totalPages})');
     } else {
       if (_errorMessage != null) {
         setState(() => _errorMessage = null);
@@ -75,7 +80,8 @@ class _UpdateProgressBottomSheetState extends State<UpdateProgressBottomSheet> {
   }
 
   Future<void> _handleSave() async {
-    final page = int.tryParse(_controller.text.trim());
+    final text = _controller.text.trim();
+    final page = text.isEmpty ? 0 : int.tryParse(text);
     if (page == null) {
       setState(() => _errorMessage = 'Masukkan angka halaman yang valid');
       return;
@@ -105,128 +111,159 @@ class _UpdateProgressBottomSheetState extends State<UpdateProgressBottomSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        left: 24,
-        right: 24,
-        top: 8,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        left: 20,
+        right: 20,
+        top: 10,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Drag Handle
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Title
           const Text(
-            'Update Progres Membaca',
+            'Progress Baca',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF6B4454),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1E293B),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Total halaman buku: ${widget.totalPages}',
-            style:
-                const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _controller,
-            keyboardType: TextInputType.number,
-            textAlign: TextAlign.center,
-            autofocus: true,
-            onChanged: _validateInput,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF6B4454),
-            ),
-            decoration: InputDecoration(
-              hintText: 'Halaman saat ini',
-              hintStyle: const TextStyle(color: Colors.black26, fontSize: 16),
-              filled: true,
-              fillColor: const Color(0xFFFAFAFA),
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: _errorMessage != null
-                      ? const Color(0xFFD9534F)
-                      : const Color(0xFFEADBDF),
-                  width: 1,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: _errorMessage != null
-                      ? const Color(0xFFD9534F)
-                      : const Color(0xFFEADBDF),
-                  width: 1,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: _errorMessage != null
-                      ? const Color(0xFFD9534F)
-                      : const Color(0xFF3B6B8A),
-                  width: 1.5,
-                ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 18),
+
+          // Input Box with Suffix
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _errorMessage != null
+                    ? const Color(0xFFEF4444)
+                    : const Color(0xFFE2E8F0),
+                width: 1.2,
               ),
             ),
-          ),
-          if (_errorMessage != null) ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Row(
               children: [
-                const Icon(Icons.error_outline_rounded,
-                    color: Color(0xFFD9534F), size: 14),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    _errorMessage!,
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    keyboardType: TextInputType.number,
+                    onChanged: _validateInput,
                     style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFFD9534F),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
                     ),
-                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      hintText: '0',
+                      hintStyle: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 15,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                Text(
+                  '/ ${widget.totalPages > 0 ? widget.totalPages : 100} Halaman',
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
                   ),
                 ),
               ],
             ),
-          ],
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3B6B8A),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 0,
+          ),
+
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage!,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFFEF4444),
               ),
-              onPressed: (_isSaving || _errorMessage != null) ? null : _handleSave,
-              child: _isSaving
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text(
-                      'Simpan Progres',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+            ),
+          ],
+          const SizedBox(height: 20),
+
+          // Simpan Button (Gradient 0088FF -> 0775D5)
+          Container(
+            width: double.infinity,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Color(0xFF0088FF),
+                  Color(0xFF0775D5),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0088FF).withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap:
+                    (_isSaving || _errorMessage != null) ? null : _handleSave,
+                borderRadius: BorderRadius.circular(12),
+                child: Center(
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Simpan',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            height: 1.0,
+                          ),
+                        ),
+                ),
+              ),
             ),
           ),
         ],

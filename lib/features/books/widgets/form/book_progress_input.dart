@@ -15,8 +15,7 @@ class BookProgressInput extends StatelessWidget {
   int get _currentPage => int.tryParse(currentPageController.text.trim()) ?? 0;
   int get _totalPages => int.tryParse(totalPagesController.text.trim()) ?? 0;
 
-  bool get _hasOverflowError =>
-      _totalPages > 0 && _currentPage > _totalPages;
+  bool get _hasOverflowError => _totalPages > 0 && _currentPage > _totalPages;
   bool get _hasNegativeError => _currentPage < 0 || _totalPages < 0;
 
   double get _progress {
@@ -211,8 +210,8 @@ class BookProgressInput extends StatelessWidget {
               borderSide: BorderSide(
                 color: hasError
                     ? const Color(0xFFD9534F)
-                    : const Color(0xFF3B6B8A),
-                width: 1.5,
+                    : const Color(0xFFEADBDF),
+                width: 1,
               ),
             ),
           ),

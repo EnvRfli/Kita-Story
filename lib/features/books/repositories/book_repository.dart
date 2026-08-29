@@ -5,10 +5,15 @@ import '../../../core/network/supabase_client.dart';
 class BookRepository {
   final _client = SupabaseNetwork.client;
 
-  Future<List<BookModel>> getBooks() async {
+  Future<List<BookModel>> getBooks({String? targetUserId}) async {
+    final user = _client.auth.currentUser;
+    final uid = targetUserId ?? user?.id;
+    if (uid == null) return [];
+
     final data = await _client
         .from('books')
         .select()
+        .eq('added_by', uid)
         .order('created_at', ascending: false);
 
     return (data as List).map((json) => BookModel.fromJson(json)).toList();
@@ -37,7 +42,8 @@ class BookRepository {
         'p_reference_id': referenceId,
       });
     } catch (e) {
-      debugPrint('Info: RPC record_activity_and_add_points failed, using increment_points fallback: $e');
+      debugPrint(
+          'Info: RPC record_activity_and_add_points failed, using increment_points fallback: $e');
       try {
         await _client.rpc('increment_points', params: {
           'user_id': userId,
@@ -91,9 +97,12 @@ class BookRepository {
             .single();
         final bookTitle = bookData['title'] as String? ?? 'Buku';
         final totalPages = bookData['total_pages'] as int? ?? 0;
-        final currentPage = updates['current_page'] as int? ?? (bookData['current_page'] as int? ?? 0);
+        final currentPage = updates['current_page'] as int? ??
+            (bookData['current_page'] as int? ?? 0);
 
-        if (totalPages > 0 && currentPage >= totalPages && updates['current_page'] != null) {
+        if (totalPages > 0 &&
+            currentPage >= totalPages &&
+            updates['current_page'] != null) {
           // Bonus finisher (+30 pts = 5 base + 25 bonus)
           await _recordActivityAndAddPoints(
             userId: user.id,
@@ -166,6 +175,20 @@ class BookRepository {
       } catch (e) {
         debugPrint('Error inserting genre $name: $e');
       }
+    }
+  }
+
+  Future<void> updateBookGenres(String bookId, List<String> genreNames) async {
+    try {
+      // 1. Delete all existing genre links for this book
+      await _client.from('book_genres').delete().eq('book_id', bookId);
+
+      // 2. Insert newly selected genres
+      if (genreNames.isNotEmpty) {
+        await addGenresToBook(bookId, genreNames);
+      }
+    } catch (e) {
+      debugPrint('Error updating book genres: $e');
     }
   }
 
@@ -486,6 +509,27 @@ class BookRepository {
       );
     } catch (e) {
       debugPrint('Error adding book snippet: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateBookSnippet(
+    String snippetId, {
+    required String imageUrl,
+    String? caption,
+    int? pageNumber,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _client.from('book_snippets').update({
+        'image_url': imageUrl,
+        'caption': caption,
+        'page_number': pageNumber,
+      }).eq('id', snippetId);
+    } catch (e) {
+      debugPrint('Error updating book snippet: $e');
       rethrow;
     }
   }

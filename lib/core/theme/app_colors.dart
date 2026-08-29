@@ -43,4 +43,20 @@ class AppColors {
       Color(0xFF0775D5),
     ],
   );
+
+  // Book List Screen Theme Tokens
+  static const Color primaryPurple = Color(0xFF5D5FEF);
+  static const Color progressOrange = Color(0xFFFF7A00);
+  static const Color fabGold = Color(0xFFFFB300);
+  static const Color cardDarkText = Color(0xFF1E293B);
+  static const Color cardSubText = Color(0xFF94A3B8);
+
+  static const LinearGradient gradientProgressOrange = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [
+      Color(0xFFFF7A00),
+      Color(0xFFFF4848),
+    ],
+  );
 }

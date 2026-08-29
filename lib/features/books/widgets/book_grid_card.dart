@@ -17,19 +17,17 @@ class BookGridCard extends StatelessWidget {
     final progress = book.totalPages > 0
         ? (book.currentPage / book.totalPages).clamp(0.0, 1.0)
         : 0.0;
-    final isCompleted = progress >= 1.0;
-    final hasStarted = book.currentPage > 0;
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFF3E4EA), width: 1.2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6B4454).withValues(alpha: 0.07),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -37,11 +35,11 @@ class BookGridCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Cover Image with Floating Badges
+              // 1. Cover Image with Rating Badge
               Expanded(
                 flex: 12,
                 child: Stack(
@@ -49,7 +47,7 @@ class BookGridCard extends StatelessWidget {
                   children: [
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(21),
+                        top: Radius.circular(15),
                       ),
                       child: book.coverUrl != null &&
                               book.coverUrl!.trim().isNotEmpty
@@ -62,101 +60,24 @@ class BookGridCard extends StatelessWidget {
                           : _buildCoverPlaceholder(),
                     ),
 
-                    // Subtle Bottom Gradient on Cover
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: 45,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.25),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Top-Left Status Badge
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isCompleted
-                              ? const Color(0xFF2E7D32).withValues(alpha: 0.88)
-                              : hasStarted
-                                  ? const Color(0xFF3B6B8A)
-                                      .withValues(alpha: 0.88)
-                                  : Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isCompleted
-                                  ? Icons.check_circle_rounded
-                                  : hasStarted
-                                      ? Icons.auto_stories_rounded
-                                      : Icons.bookmark_border_rounded,
-                              size: 11,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              isCompleted
-                                  ? 'Selesai'
-                                  : hasStarted
-                                      ? '${(progress * 100).toInt()}%'
-                                      : 'Baru',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
                     // Top-Right Rating Badge
-                    if (book.personalRating != null &&
-                        book.personalRating! > 0)
+                    if (book.personalRating != null && book.personalRating! > 0)
                       Positioned(
                         top: 8,
                         right: 8,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 7,
-                            vertical: 3.5,
+                            vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.92),
-                            borderRadius: BorderRadius.circular(10),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withValues(alpha: 0.12),
                                 blurRadius: 4,
-                                offset: const Offset(0, 1),
+                                offset: const Offset(0, 1.5),
                               ),
                             ],
                           ),
@@ -166,15 +87,15 @@ class BookGridCard extends StatelessWidget {
                               const Icon(
                                 Icons.star_rounded,
                                 color: Color(0xFFFFB800),
-                                size: 13,
+                                size: 18,
                               ),
                               const SizedBox(width: 2.5),
                               Text(
                                 '${book.personalRating}',
                                 style: const TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF6B4454),
+                                  color: Color(0xFF1E293B),
                                 ),
                               ),
                             ],
@@ -196,79 +117,70 @@ class BookGridCard extends StatelessWidget {
                     Text(
                       book.title,
                       style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF6B4454),
-                        height: 1.25,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E293B),
+                        height: 1.5,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 3),
 
-                    // Author
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.person_outline_rounded,
-                          size: 12,
-                          color: Color(0xFF9E7787),
-                        ),
-                        const SizedBox(width: 3),
-                        Expanded(
-                          child: Text(
-                            (book.author != null && book.author!.isNotEmpty)
-                                ? book.author!
-                                : 'Penulis tidak dikenal',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF9E7787),
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                    // Author (No user icon, clean subtitle)
+                    Text(
+                      (book.author != null && book.author!.isNotEmpty)
+                          ? book.author!
+                          : 'Penulis tidak dikenal',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w400,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
 
-                    // Reading Progress Track
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 5.5,
-                        backgroundColor: const Color(0xFFF3E8EC),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          isCompleted
-                              ? const Color(0xFF2E7D32)
-                              : const Color(0xFF3B6B8A),
+                    // Custom Gradient Progress Bar (Orange / Red-Orange)
+                    Container(
+                      height: 8,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: progress,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: AppColors.gradientProgressOrange,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 5),
 
-                    // Pages summary
+                    // Pages summary & Percentage
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '${book.currentPage} / ${book.totalPages} hlm',
+                          '${book.currentPage} / ${book.totalPages}',
                           style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF94A3B8),
                           ),
                         ),
                         Text(
                           '${(progress * 100).toInt()}%',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: isCompleted
-                                ? const Color(0xFF2E7D32)
-                                : const Color(0xFF3B6B8A),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFFF7A00),
                           ),
                         ),
                       ],

@@ -453,12 +453,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Button "Kunjungi →"
                   InkWell(
-                    onTap: () => _showPartnerModal(
-                      context,
-                      partnerName,
-                      partnerPoints,
-                      partnerPhotoUrl,
-                    ),
+                    onTap: () => context.push('/partner-home'),
                     borderRadius: BorderRadius.circular(14),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -727,117 +722,23 @@ class _HomeScreenState extends State<HomeScreen> {
   // WIDGET: CONVEX BOTTOM NAVIGATION BAR
   // ==========================================
   Widget _buildBottomNavigationBar(BuildContext context) {
-    return ConvexAppBar(
-      style: TabStyle.reactCircle,
+    return ConvexAppBar.builder(
+      count: 2,
       backgroundColor: Colors.white,
-      activeColor: const Color(0xFF007DFE),
-      color: const Color(0xFF8E8E93),
       curveSize: 85,
-      top: -24,
-      height: 56,
+      top: -30,
+      height: 60,
       elevation: 6,
       shadowColor: const Color(0xFF6B4454).withValues(alpha: 0.12),
-      items: const [
-        TabItem(
-          icon: Icons.home_rounded,
-          title: 'Beranda',
-        ),
-        TabItem(
-          icon: Icons.person_outline_rounded,
-          title: 'Profil',
-        ),
-      ],
       initialActiveIndex: _currentNavIndex,
+      itemBuilder: _CustomConvexTabBuilder(
+        titles: const ['Beranda', 'Profil'],
+      ),
       onTap: (int index) {
         setState(() => _currentNavIndex = index);
         if (index == 1) {
           _showProfileModal(context);
         }
-      },
-    );
-  }
-
-  // ==========================================
-  // MODAL: PARTNER DETAILS MODAL
-  // ==========================================
-  void _showPartnerModal(
-    BuildContext context,
-    String partnerName,
-    int partnerPoints,
-    String? partnerPhotoUrl,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(26),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 42,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFFFCC00), width: 3),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(50),
-                  child: partnerPhotoUrl != null && partnerPhotoUrl.isNotEmpty
-                      ? Image.network(
-                          partnerPhotoUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _defaultPartnerAvatar(),
-                        )
-                      : _defaultPartnerAvatar(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                partnerName,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF222222),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Pasangan Spesial Anda • $partnerPoints Poin',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF777777),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ListTile(
-                leading:
-                    const Icon(Icons.auto_stories, color: Color(0xFF007DFE)),
-                title: const Text('Lihat Rak Buku Pasangan'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.push('/books');
-                },
-              ),
-              const SizedBox(height: 10),
-            ],
-          ),
-        );
       },
     );
   }
@@ -923,3 +824,166 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+// ==========================================
+// CUSTOM CONVEX TAB BUILDER
+// ==========================================
+class _CustomConvexTabBuilder extends DelegateBuilder {
+  final List<String> titles;
+
+  _CustomConvexTabBuilder({
+    required this.titles,
+  });
+
+  @override
+  Widget build(BuildContext context, int index, bool active) {
+    final title = titles[index];
+
+    if (active) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF007DFE),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF007DFE).withValues(alpha: 0.45),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Center(
+              child: index == 0
+                  ? const CuteHomeIcon(
+                      size: 25,
+                      color: Colors.white,
+                    )
+                  : const Icon(
+                      Icons.person_outline_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF007DFE),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (index == 0)
+          const CuteHomeIcon(
+            size: 24,
+            color: Color(0xFF8E8E93),
+          )
+        else
+          const Icon(
+            Icons.person_outline_rounded,
+            color: Color(0xFF8E8E93),
+            size: 25,
+          ),
+        const SizedBox(height: 4),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF8E8E93),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  bool fixed() => false;
+}
+
+// ==========================================
+// CUSTOM WIDGET: CUTE HOME OUTLINE ICON
+// ==========================================
+class CuteHomeIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const CuteHomeIcon({
+    super.key,
+    this.size = 25,
+    this.color = Colors.white,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _CuteHomeIconPainter(color: color),
+    );
+  }
+}
+
+class _CuteHomeIconPainter extends CustomPainter {
+  final Color color;
+
+  _CuteHomeIconPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path();
+
+    // Pentagonal outer house with rounded apex & joints
+    path.moveTo(w * 0.15, h * 0.44);
+    path.lineTo(w * 0.50, h * 0.12);
+    path.lineTo(w * 0.85, h * 0.44);
+    path.lineTo(w * 0.85, h * 0.88);
+
+    // Bottom right to door
+    path.lineTo(w * 0.63, h * 0.88);
+
+    // Arched door
+    path.lineTo(w * 0.63, h * 0.56);
+    path.arcToPoint(
+      Offset(w * 0.37, h * 0.56),
+      radius: Radius.circular(w * 0.13),
+      clockwise: false,
+    );
+    path.lineTo(w * 0.37, h * 0.88);
+
+    // Door to bottom left
+    path.lineTo(w * 0.15, h * 0.88);
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CuteHomeIconPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+

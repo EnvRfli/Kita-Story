@@ -149,7 +149,7 @@ class _NoteFormBottomSheetState extends State<NoteFormBottomSheet> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Color(0xFF3B6B8A), width: 1.5),
+                borderSide: const BorderSide(color: Color(0xFFEADBDF), width: 1),
               ),
             ),
           ),

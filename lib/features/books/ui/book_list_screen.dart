@@ -2,13 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../auth/providers/auth_provider.dart';
 import '../models/book_model.dart';
+import '../repositories/book_repository.dart';
 import '../providers/book_provider.dart';
 import '../widgets/widgets.dart';
 
 class BookListScreen extends StatefulWidget {
-  const BookListScreen({super.key});
+  final String? partnerId;
+  final String? partnerName;
+  final bool isReadOnly;
+
+  const BookListScreen({
+    super.key,
+    this.partnerId,
+    this.partnerName,
+    this.isReadOnly = false,
+  });
 
   @override
   State<BookListScreen> createState() => _BookListScreenState();
@@ -16,15 +25,42 @@ class BookListScreen extends StatefulWidget {
 
 class _BookListScreenState extends State<BookListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  String _selectedFilter = 'all'; // 'all', 'reading', 'completed', 'favorites'
+  final BookRepository _repository = BookRepository();
+
+  String _selectedFilter = 'all'; // 'all', 'reading', 'completed'
   bool _showSearchBar = false;
+
+  List<BookModel> _partnerBooks = [];
+  bool _isLoadingPartner = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<BookProvider>(context, listen: false).fetchBooks();
+      if (widget.isReadOnly) {
+        _fetchPartnerBooks();
+      } else {
+        Provider.of<BookProvider>(context, listen: false).fetchBooks();
+      }
     });
+  }
+
+  Future<void> _fetchPartnerBooks() async {
+    setState(() => _isLoadingPartner = true);
+    try {
+      final books =
+          await _repository.getBooks(targetUserId: widget.partnerId);
+      if (mounted) {
+        setState(() {
+          _partnerBooks = books;
+          _isLoadingPartner = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingPartner = false);
+      }
+    }
   }
 
   @override
@@ -56,96 +92,264 @@ class _BookListScreenState extends State<BookListScreen> {
           return isReading;
         case 'completed':
           return isCompleted;
-        case 'favorites':
-          return (book.personalRating ?? 0) >= 4;
         default:
           return true;
       }
     }).toList();
   }
 
-  Future<void> _handleLogout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Keluar Akun',
-          style: TextStyle(
-            color: Color(0xFF6B4454),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: const Text(
-          'Apakah Anda yakin ingin keluar dari akun Kita Story?',
-          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD9534F),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFCFCFD),
+      body: widget.isReadOnly ? _buildPartnerBody() : _buildMyBooksBody(),
+      floatingActionButton: widget.isReadOnly
+          ? null
+          : Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.fabGold,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.fabGold.withValues(alpha: 0.45),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    await context.push('/add-book');
+                    if (!context.mounted) return;
+                    Provider.of<BookProvider>(context, listen: false)
+                        .fetchBooks();
+                  },
+                  customBorder: const CircleBorder(),
+                  child: const Center(
+                    child: Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
               ),
             ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Keluar', style: TextStyle(color: Colors.white)),
+    );
+  }
+
+  Widget _buildPartnerBody() {
+    final allBooks = _partnerBooks;
+    final filteredBooks = _filterBooks(allBooks);
+
+    final completedCount = allBooks
+        .where((b) => b.totalPages > 0 && b.currentPage >= b.totalPages)
+        .length;
+    final readingCount = allBooks
+        .where((b) =>
+            b.currentPage > 0 &&
+            (b.totalPages == 0 || b.currentPage < b.totalPages))
+        .length;
+
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          // Sticky Top Header
+          _buildStickyHeader(
+            title: widget.partnerName != null &&
+                    widget.partnerName!.trim().isNotEmpty
+                ? 'Bacaan ${widget.partnerName}'
+                : 'Bacaan Pasangan',
+            allBooks: allBooks,
+            readingCount: readingCount,
+            completedCount: completedCount,
+          ),
+
+          // Scrollable Content
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _fetchPartnerBooks,
+              color: AppColors.primaryPurple,
+              backgroundColor: Colors.white,
+              child: _isLoadingPartner && allBooks.isEmpty
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.primaryPurple,
+                        ),
+                      ),
+                    )
+                  : allBooks.isEmpty
+                      ? const EmptyBooksView(
+                          onAddPressed: null,
+                        )
+                      : filteredBooks.isEmpty
+                          ? _buildNoSearchResultsState()
+                          : GridView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(
+                                parent: BouncingScrollPhysics(),
+                              ),
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                6,
+                                16,
+                                95,
+                              ),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.58,
+                                crossAxisSpacing: 14,
+                                mainAxisSpacing: 16,
+                              ),
+                              itemCount: filteredBooks.length,
+                              itemBuilder: (context, index) {
+                                final book = filteredBooks[index];
+                                return BookGridCard(
+                                  book: book,
+                                  onTap: () {
+                                    context.push(
+                                      '/book-detail',
+                                      extra: {
+                                        'book': book,
+                                        'isReadOnly': true,
+                                      },
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+            ),
           ),
         ],
       ),
     );
-
-    if (confirmed == true && mounted) {
-      await Provider.of<AuthProvider>(context, listen: false).signOut();
-      if (mounted) {
-        context.go('/login');
-      }
-    }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFF6F8),
-      body: Consumer<BookProvider>(
-        builder: (context, provider, child) {
-          final allBooks = provider.books;
-          final filteredBooks = _filterBooks(allBooks);
+  Widget _buildMyBooksBody() {
+    return Consumer<BookProvider>(
+      builder: (context, provider, child) {
+        final allBooks = provider.books;
+        final filteredBooks = _filterBooks(allBooks);
 
-          // Calculate statistics
-          final completedCount = allBooks
-              .where((b) => b.totalPages > 0 && b.currentPage >= b.totalPages)
-              .length;
-          final readingCount = allBooks
-              .where((b) =>
-                  b.currentPage > 0 &&
-                  (b.totalPages == 0 || b.currentPage < b.totalPages))
-              .length;
+        final completedCount = allBooks
+            .where((b) => b.totalPages > 0 && b.currentPage >= b.totalPages)
+            .length;
+        final readingCount = allBooks
+            .where((b) =>
+                b.currentPage > 0 &&
+                (b.totalPages == 0 || b.currentPage < b.totalPages))
+            .length;
 
-          return RefreshIndicator(
-            onRefresh: provider.fetchBooks,
-            color: const Color(0xFF3B6B8A),
-            backgroundColor: Colors.white,
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
+        return SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // Sticky Top Header
+              _buildStickyHeader(
+                title: 'Bacaan',
+                allBooks: allBooks,
+                readingCount: readingCount,
+                completedCount: completedCount,
               ),
-              slivers: [
-                // 1. Pinned Pastel App Bar (No overlap on scroll)
-                SliverAppBar(
-                  pinned: true,
-                  backgroundColor: const Color(0xFFFFF6F8),
-                  elevation: 0,
-                  scrolledUnderElevation: 1,
-                  shadowColor: Colors.black.withValues(alpha: 0.05),
-                  leading: IconButton(
+
+              // Scrollable Content
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: provider.fetchBooks,
+                  color: AppColors.primaryPurple,
+                  backgroundColor: Colors.white,
+                  child: provider.isLoading && allBooks.isEmpty
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primaryPurple,
+                            ),
+                          ),
+                        )
+                      : allBooks.isEmpty
+                          ? EmptyBooksView(
+                              onAddPressed: () async {
+                                await context.push('/add-book');
+                                provider.fetchBooks();
+                              },
+                            )
+                          : filteredBooks.isEmpty
+                              ? _buildNoSearchResultsState()
+                              : GridView.builder(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(
+                                    parent: BouncingScrollPhysics(),
+                                  ),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    6,
+                                    16,
+                                    95,
+                                  ),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 0.58,
+                                    crossAxisSpacing: 14,
+                                    mainAxisSpacing: 16,
+                                  ),
+                                  itemCount: filteredBooks.length,
+                                  itemBuilder: (context, index) {
+                                    final book = filteredBooks[index];
+                                    return BookGridCard(
+                                      book: book,
+                                      onTap: () async {
+                                        await context.push(
+                                          '/book-detail',
+                                          extra: {
+                                            'book': book,
+                                            'isReadOnly': false,
+                                          },
+                                        );
+                                        provider.fetchBooks();
+                                      },
+                                    );
+                                  },
+                                ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStickyHeader({
+    required String title,
+    required List<BookModel> allBooks,
+    required int readingCount,
+    required int completedCount,
+  }) {
+    return Container(
+      color: const Color(0xFFFCFCFD),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Top App Bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
                     icon: const Icon(
                       Icons.arrow_back_rounded,
-                      color: Color(0xFF6B4454),
+                      color: Color(0xFF1E293B),
+                      size: 22,
                     ),
                     onPressed: () {
                       if (context.canPop()) {
@@ -153,329 +357,54 @@ class _BookListScreenState extends State<BookListScreen> {
                       }
                     },
                   ),
-                  centerTitle: true,
-                  title: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'My Bookshelf',
-                        style: TextStyle(
-                          color: Color(0xFF6B4454),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6B4454)
-                              .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${allBooks.length}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF6B4454),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    IconButton(
-                      icon: Icon(
-                        _showSearchBar
-                            ? Icons.search_off_rounded
-                            : Icons.search_rounded,
-                        color: const Color(0xFF6B4454),
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _showSearchBar = !_showSearchBar;
-                          if (!_showSearchBar) {
-                            _searchController.clear();
-                          }
-                        });
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.logout_rounded,
-                        color: Color(0xFF6B4454),
-                      ),
-                      onPressed: _handleLogout,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
                 ),
-
-                // 2. Interactive Stats Ribbon
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        _buildStatsRow(
-                          total: allBooks.length,
-                          reading: readingCount,
-                          completed: completedCount,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Search Bar (Expandable)
-                        if (_showSearchBar) ...[
-                          _buildSearchField(),
-                          const SizedBox(height: 14),
-                        ],
-
-                        // Filter Chips Row
-                        _buildFilterChips(
-                          total: allBooks.length,
-                          reading: readingCount,
-                          completed: completedCount,
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // 3. Grid View / Empty State
-                if (provider.isLoading && allBooks.isEmpty)
-                  const SliverFillRemaining(
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Color(0xFF3B6B8A)),
-                      ),
-                    ),
-                  )
-                else if (allBooks.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: EmptyBooksView(
-                      onAddPressed: () async {
-                        await context.push('/add-book');
-                        provider.fetchBooks();
-                      },
-                    ),
-                  )
-                else if (filteredBooks.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _buildNoSearchResultsState(),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
-                    sliver: SliverGrid(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.58,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final book = filteredBooks[index];
-                          return BookGridCard(
-                            book: book,
-                            onTap: () async {
-                              await context.push('/book-detail', extra: book);
-                              provider.fetchBooks();
-                            },
-                          );
-                        },
-                        childCount: filteredBooks.length,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF3B6B8A),
-        elevation: 4,
-        highlightElevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
-        label: const Text(
-          'Tambah Buku',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-        ),
-        onPressed: () async {
-          await context.push('/add-book');
-          if (!context.mounted) return;
-          Provider.of<BookProvider>(context, listen: false).fetchBooks();
-        },
-      ),
-    );
-  }
-
-  Widget _buildStatsRow({
-    required int total,
-    required int reading,
-    required int completed,
-  }) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatItem(
-            label: 'Total Koleksi',
-            value: '$total',
-            icon: Icons.library_books_rounded,
-            color: const Color(0xFF6B4454),
-            isSelected: _selectedFilter == 'all',
-            onTap: () => setState(() => _selectedFilter = 'all'),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildStatItem(
-            label: 'Sedang Dibaca',
-            value: '$reading',
-            icon: Icons.auto_stories_rounded,
-            color: const Color(0xFF3B6B8A),
-            isSelected: _selectedFilter == 'reading',
-            onTap: () => setState(() => _selectedFilter = 'reading'),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildStatItem(
-            label: 'Tamat',
-            value: '$completed',
-            icon: Icons.check_circle_rounded,
-            color: const Color(0xFF2E7D32),
-            isSelected: _selectedFilter == 'completed',
-            onTap: () => setState(() => _selectedFilter = 'completed'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatItem({
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? color : const Color(0xFFF3E4EA),
-            width: isSelected ? 1.8 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: isSelected ? 0.12 : 0.03),
-              blurRadius: isSelected ? 8 : 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 14, color: color),
-                const SizedBox(width: 4),
                 Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 19,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    icon: Icon(
+                      _showSearchBar
+                          ? Icons.search_off_rounded
+                          : Icons.search_rounded,
+                      color: const Color(0xFF1E293B),
+                      size: 22,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _showSearchBar = !_showSearchBar;
+                        if (!_showSearchBar) {
+                          _searchController.clear();
+                        }
+                      });
+                    },
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+          ),
 
-  Widget _buildSearchField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEADBDF), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+          // Expandable Search Bar
+          if (_showSearchBar)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: _buildSearchField(),
+            ),
+
+          // Sticky Filter Pills
+          _buildFilterChips(
+            total: allBooks.length,
+            reading: readingCount,
+            completed: completedCount,
           ),
         ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (_) => setState(() {}),
-        style: const TextStyle(fontSize: 13, color: Color(0xFF6B4454)),
-        decoration: InputDecoration(
-          hintText: 'Cari judul buku atau penulis...',
-          hintStyle: const TextStyle(color: Colors.black38, fontSize: 13),
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: Color(0xFF6B4454),
-            size: 20,
-          ),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: Colors.black45,
-                    size: 18,
-                  ),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {});
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        ),
       ),
     );
   }
@@ -487,40 +416,70 @@ class _BookListScreenState extends State<BookListScreen> {
   }) {
     final filters = [
       {'id': 'all', 'label': 'Semua ($total)'},
-      {'id': 'reading', 'label': 'Sedang Baca ($reading)'},
+      {'id': 'reading', 'label': 'Sedang Dibaca ($reading)'},
       {'id': 'completed', 'label': 'Selesai ($completed)'},
-      {'id': 'favorites', 'label': 'Favorit ★'},
     ];
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
+      clipBehavior: Clip.none,
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
       child: Row(
         children: filters.map((f) {
           final isSelected = _selectedFilter == f['id'];
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(f['label']!),
-              labelStyle: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? Colors.white : const Color(0xFF6B4454),
-              ),
-              selected: isSelected,
-              selectedColor: const Color(0xFF6B4454),
-              backgroundColor: Colors.white.withValues(alpha: 0.7),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: BorderSide(
-                  color: isSelected
-                      ? const Color(0xFF6B4454)
-                      : const Color(0xFFEADBDF),
+            child: InkWell(
+              onTap: () {
+                setState(() => _selectedFilter = f['id'] as String);
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  gradient: isSelected
+                      ? const LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Color(0xFF0088FF),
+                            Color(0xFF0775D5),
+                          ],
+                        )
+                      : null,
+                  color: isSelected ? null : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: isSelected
+                      ? null
+                      : Border.all(
+                          color: const Color(0xFFE2E8F0),
+                          width: 1.2,
+                        ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isSelected
+                          ? const Color(0xFF0088FF).withValues(alpha: 0.28)
+                          : Colors.black.withValues(alpha: 0.03),
+                      blurRadius: isSelected ? 8 : 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  f['label'] as String,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : const Color(0xFF64748B),
+                    fontWeight:
+                        isSelected ? FontWeight.w700 : FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-              onSelected: (val) {
-                if (val) setState(() => _selectedFilter = f['id']!);
-              },
             ),
           );
         }).toList(),
@@ -528,52 +487,99 @@ class _BookListScreenState extends State<BookListScreen> {
     );
   }
 
+  Widget _buildSearchField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (_) => setState(() {}),
+        autofocus: true,
+        style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+        decoration: InputDecoration(
+          hintText: 'Cari judul buku atau penulis...',
+          hintStyle: const TextStyle(
+            fontSize: 13.5,
+            color: Color(0xFF94A3B8),
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF94A3B8),
+            size: 20,
+          ),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF94A3B8),
+                    size: 18,
+                  ),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {});
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          focusedErrorBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildNoSearchResultsState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.all(32.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF6B4454).withValues(alpha: 0.08),
+                color: const Color(0xFFF1F5F9),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.search_off_rounded,
                 size: 40,
-                color: Color(0xFF6B4454),
+                color: Color(0xFF94A3B8),
               ),
             ),
             const SizedBox(height: 16),
             const Text(
-              'Buku Tidak Ditemukan',
+              'Tidak Ditemukan',
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF6B4454),
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Coba ubah kata kunci pencarian atau filter status membaca Anda.',
+            Text(
+              'Tidak ada buku yang cocok dengan "${_searchController.text.trim()}".',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 18),
-            TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _searchController.clear();
-                  _selectedFilter = 'all';
-                });
-              },
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Reset Filter'),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF3B6B8A),
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF94A3B8),
               ),
             ),
           ],
