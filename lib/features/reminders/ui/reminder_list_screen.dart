@@ -25,7 +25,6 @@ class ReminderListScreen extends StatefulWidget {
 
 class _ReminderListScreenState extends State<ReminderListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  bool _showSearchBar = false;
 
   @override
   void initState() {
@@ -99,64 +98,44 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                 // 1. Top Header App Bar
                 Container(
                   color: const Color(0xFFFCFCFD),
-                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-                  child: Stack(
-                    alignment: Alignment.center,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Row(
                     children: [
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back_rounded,
-                            color: Color(0xFF1E293B),
-                            size: 22,
-                          ),
-                          onPressed: () {
-                            if (context.canPop()) {
-                              context.pop();
-                            }
-                          },
-                        ),
-                      ),
-                      Text(
-                        title,
-                        style: const TextStyle(
+                      IconButton(
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
                           color: Color(0xFF1E293B),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 19,
-                          letterSpacing: -0.3,
+                          size: 22,
                         ),
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          }
+                        },
                       ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: IconButton(
-                          icon: Icon(
-                            _showSearchBar
-                                ? Icons.search_off_rounded
-                                : Icons.search_rounded,
-                            color: const Color(0xFF1E293B),
-                            size: 22,
+                      Expanded(
+                        child: Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF1E293B),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 19,
+                            letterSpacing: -0.3,
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _showSearchBar = !_showSearchBar;
-                              if (!_showSearchBar) {
-                                _searchController.clear();
-                              }
-                            });
-                          },
                         ),
                       ),
+                      const SizedBox(width: 48), // Balances leading back button
                     ],
                   ),
                 ),
 
-                // Expandable Search Bar
-                if (_showSearchBar)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                    child: _buildSearchField(),
-                  ),
+                // 2. Permanent Search Bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  child: _buildSearchField(),
+                ),
 
                 // 2. Reminders List / Empty State
                 Expanded(
@@ -270,25 +249,24 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
 
   Widget _buildSearchField() {
     return Container(
+      height: 48,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.1,
+        ),
       ),
       child: TextField(
         controller: _searchController,
         onChanged: (_) => setState(() {}),
-        autofocus: true,
-        style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+        style: const TextStyle(
+          fontSize: 14,
+          color: Color(0xFF1E293B),
+        ),
         decoration: InputDecoration(
-          hintText: 'Cari agenda atau pengingat...',
+          hintText: 'Cari pengingat...',
           hintStyle: const TextStyle(
             fontSize: 13.5,
             color: Color(0xFF94A3B8),
@@ -303,7 +281,7 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                   icon: const Icon(
                     Icons.close_rounded,
                     color: Color(0xFF94A3B8),
-                    size: 18,
+                    size: 16,
                   ),
                   onPressed: () {
                     _searchController.clear();
@@ -312,11 +290,9 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                 )
               : null,
           border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 12,
+            horizontal: 12,
+            vertical: 13,
           ),
         ),
       ),

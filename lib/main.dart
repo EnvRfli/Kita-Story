@@ -11,6 +11,7 @@ import 'features/notes/providers/note_provider.dart';
 import 'features/reminders/providers/reminder_provider.dart';
 import 'features/recipes/providers/recipe_provider.dart';
 import 'features/history/providers/history_provider.dart';
+import 'features/vacations/providers/vacation_provider.dart';
 
 import 'core/router/app_router.dart';
 
@@ -23,7 +24,7 @@ void main() async {
   // Initialize Supabase
   await SupabaseNetwork.initialize();
 
-  // Initialize Notification Service
+  // Initialize Local Notifications
   await NotificationService.initialize();
 
   runApp(const KitaStoryApp());
@@ -42,6 +43,7 @@ class KitaStoryApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ReminderProvider()),
         ChangeNotifierProvider(create: (_) => RecipeProvider()),
         ChangeNotifierProvider(create: (_) => HistoryProvider()),
+        ChangeNotifierProvider(create: (_) => VacationProvider()),
       ],
       child: MaterialApp.router(
         title: 'DayTale',

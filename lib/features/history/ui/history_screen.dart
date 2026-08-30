@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../models/activity_log_model.dart';
 import '../providers/history_provider.dart';
 import '../widgets/history_card.dart';
 
@@ -28,141 +29,112 @@ class _HistoryScreenState extends State<HistoryScreen> {
     super.dispose();
   }
 
+  List<ActivityLogModel> _filterLogs(List<ActivityLogModel> logs) {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return logs;
+
+    return logs.where((log) {
+      final titleMatch = log.title.toLowerCase().contains(query);
+      final descMatch = log.description.toLowerCase().contains(query);
+      final userMatch = log.userName?.toLowerCase().contains(query) ?? false;
+      return titleMatch || descMatch || userMatch;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF8FAFC),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Color(0xFF1E293B),
-            size: 22,
-          ),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text(
-          'Riwayat',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF1E293B),
-            letterSpacing: -0.3,
-          ),
-        ),
-      ),
+      backgroundColor: const Color(0xFFFCFCFD),
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
-            // 1. Search Bar Row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            // 1. Header Bar
+            Container(
+              color: const Color(0xFFFCFCFD),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Clean Single-Layer Search Field
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: TextField(
-                        controller: _searchController,
-                        style: const TextStyle(
-                          fontSize: 14.5,
-                          color: Color(0xFF1E293B),
-                          fontWeight: FontWeight.w500,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Cari riwayat...',
-                          hintStyle: const TextStyle(
-                            fontSize: 14.5,
-                            color: Color(0xFF94A3B8),
-                            fontWeight: FontWeight.w400,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF1F5F9),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 13,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFFF8A00),
-                              width: 1.2,
-                            ),
-                          ),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? GestureDetector(
-                                  onTap: () {
-                                    _searchController.clear();
-                                    context
-                                        .read<HistoryProvider>()
-                                        .clearSearch();
-                                  },
-                                  child: const Icon(
-                                    Icons.close_rounded,
-                                    color: Color(0xFF94A3B8),
-                                    size: 18,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        onChanged: (value) {
-                          context.read<HistoryProvider>().setSearchQuery(value);
-                        },
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Color(0xFF1E293B),
+                      size: 22,
+                    ),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      }
+                    },
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'Riwayat',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF1E293B),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 19,
+                        letterSpacing: -0.3,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-
-                  // Orange Search Button
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF8A00),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              const Color(0xFFFF8A00).withValues(alpha: 0.30),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () {
-                          context
-                              .read<HistoryProvider>()
-                              .setSearchQuery(_searchController.text);
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: const Center(
-                          child: Icon(
-                            Icons.search_rounded,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(width: 48), // Balances leading back button
                 ],
+              ),
+            ),
+
+            // 2. Search Bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFE2E8F0),
+                    width: 1.1,
+                  ),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF1E293B),
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Cari riwayat...',
+                    hintStyle: const TextStyle(
+                      fontSize: 13.5,
+                      color: Color(0xFF94A3B8),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: Color(0xFF94A3B8),
+                      size: 20,
+                    ),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: Color(0xFF94A3B8),
+                              size: 16,
+                            ),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 13,
+                    ),
+                  ),
+                ),
               ),
             ),
 
@@ -213,7 +185,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     );
                   }
 
-                  final logs = provider.logs;
+                  final logs = _filterLogs(provider.logs);
 
                   if (logs.isEmpty) {
                     return RefreshIndicator(
@@ -248,7 +220,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  provider.searchQuery.isNotEmpty
+                                  _searchController.text.trim().isNotEmpty
                                       ? 'Tidak ada riwayat yang cocok'
                                       : 'Belum Ada Riwayat Aktivitas',
                                   style: const TextStyle(
@@ -259,7 +231,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  provider.searchQuery.isNotEmpty
+                                  _searchController.text.trim().isNotEmpty
                                       ? 'Coba gunakan kata kunci pencarian yang lain.'
                                       : 'Aktivitas membaca, resep, catatan, dan pengingat akan tercatat di sini.',
                                   style: const TextStyle(

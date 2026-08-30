@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/app_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/note_model.dart';
 import '../providers/note_provider.dart';
@@ -27,7 +28,8 @@ class NoteListScreen extends StatefulWidget {
 
 class _NoteListScreenState extends State<NoteListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  bool _showSearchBar = false;
+  bool _hasOrderChanged = false;
+  bool _isSavingOrder = false;
 
   @override
   void initState() {
@@ -87,6 +89,25 @@ class _NoteListScreenState extends State<NoteListScreen> {
         );
   }
 
+  Future<void> _saveOrder() async {
+    setState(() => _isSavingOrder = true);
+    final success = await context.read<NoteProvider>().saveNotesOrder(
+          targetUserId: widget.isReadOnly ? widget.partnerId : null,
+        );
+    if (!mounted) return;
+    setState(() {
+      _isSavingOrder = false;
+      if (success) {
+        _hasOrderChanged = false;
+      }
+    });
+    if (success) {
+      AppSnackBar.success(context, 'Urutan catatan berhasil disimpan! ✨');
+    } else {
+      AppSnackBar.error(context, 'Gagal menyimpan urutan catatan.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = widget.isReadOnly
@@ -109,72 +130,49 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 // 1. Top Header App Bar
                 Container(
                   color: const Color(0xFFFCFCFD),
-                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-                  child: Stack(
-                    alignment: Alignment.center,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Row(
                     children: [
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back_rounded,
-                            color: Color(0xFF1E293B),
-                            size: 22,
-                          ),
-                          onPressed: () {
-                            if (context.canPop()) {
-                              context.pop();
-                            }
-                          },
-                        ),
-                      ),
-                      Text(
-                        title,
-                        style: const TextStyle(
+                      IconButton(
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
                           color: Color(0xFF1E293B),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 19,
-                          letterSpacing: -0.3,
+                          size: 22,
                         ),
+                        onPressed: () => context.pop(),
                       ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: IconButton(
-                          icon: Icon(
-                            _showSearchBar
-                                ? Icons.search_off_rounded
-                                : Icons.search_rounded,
-                            color: const Color(0xFF1E293B),
-                            size: 22,
+                      Expanded(
+                        child: Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1E293B),
+                            letterSpacing: -0.3,
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _showSearchBar = !_showSearchBar;
-                              if (!_showSearchBar) {
-                                _searchController.clear();
-                              }
-                            });
-                          },
                         ),
                       ),
+                      const SizedBox(width: 48), // Balances leading back button
                     ],
                   ),
                 ),
 
-                // Expandable Search Bar
-                if (_showSearchBar)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                    child: _buildSearchField(),
-                  ),
+                // 2. Permanent Search Bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  child: _buildSearchField(),
+                ),
 
-                // 2. Notes List / Empty State
+                // 3. Notes List or Empty State
                 Expanded(
                   child: RefreshIndicator(
-                    onRefresh: () {
+                    onRefresh: () async {
                       final authProvider =
                           Provider.of<AuthProvider>(context, listen: false);
-                      return provider.fetchNotes(
+                      setState(() => _hasOrderChanged = false);
+                      await provider.fetchNotes(
                         targetUserId:
                             widget.isReadOnly ? widget.partnerId : null,
                         partnerId: authProvider.partnerProfile?.id,
@@ -216,6 +214,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                               .isEmpty) {
                                         provider.reorderNotes(
                                             oldIndex, newIndex);
+                                        setState(() {
+                                          _hasOrderChanged = true;
+                                        });
                                       }
                                     },
                                     proxyDecorator: (Widget child, int index,
@@ -264,7 +265,115 @@ class _NoteListScreenState extends State<NoteListScreen> {
           );
         },
       ),
-      floatingActionButton: widget.isReadOnly
+      bottomNavigationBar: _hasOrderChanged && !widget.isReadOnly
+          ? Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x18000000),
+                    blurRadius: 18,
+                    offset: Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: _isSavingOrder
+                          ? null
+                          : () {
+                              final authProvider =
+                                  Provider.of<AuthProvider>(context, listen: false);
+                              final partner = authProvider.partnerProfile;
+                              Provider.of<NoteProvider>(context, listen: false)
+                                  .fetchNotes(
+                                targetUserId:
+                                    widget.isReadOnly ? widget.partnerId : null,
+                                partnerId: partner?.id,
+                              );
+                              setState(() => _hasOrderChanged = false);
+                            },
+                      child: const Text(
+                        'Batal',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.gradientBiru,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0088FF).withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _isSavingOrder ? null : _saveOrder,
+                          borderRadius: BorderRadius.circular(14),
+                          child: Center(
+                            child: _isSavingOrder
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2.2,
+                                    ),
+                                  )
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.check_rounded,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Simpan Urutan',
+                                        style: TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : null,
+      floatingActionButton: (widget.isReadOnly || _hasOrderChanged)
           ? null
           : Container(
               width: 56,
@@ -300,25 +409,24 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   Widget _buildSearchField() {
     return Container(
+      height: 48,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.1,
+        ),
       ),
       child: TextField(
         controller: _searchController,
         onChanged: (_) => setState(() {}),
-        autofocus: true,
-        style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+        style: const TextStyle(
+          fontSize: 14,
+          color: Color(0xFF1E293B),
+        ),
         decoration: InputDecoration(
-          hintText: 'Cari judul catatan atau isi...',
+          hintText: 'Cari catatan...',
           hintStyle: const TextStyle(
             fontSize: 13.5,
             color: Color(0xFF94A3B8),
@@ -333,7 +441,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                   icon: const Icon(
                     Icons.close_rounded,
                     color: Color(0xFF94A3B8),
-                    size: 18,
+                    size: 16,
                   ),
                   onPressed: () {
                     _searchController.clear();
@@ -342,11 +450,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 )
               : null,
           border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 12,
+            horizontal: 12,
+            vertical: 13,
           ),
         ),
       ),

@@ -20,6 +20,12 @@ import '../../features/recipes/ui/add_recipe_screen.dart';
 import '../../features/recipes/ui/recipe_detail_screen.dart';
 import '../../features/recipes/models/recipe_model.dart';
 import '../../features/history/ui/history_screen.dart';
+import '../../features/vacations/ui/vacation_list_screen.dart';
+import '../../features/vacations/ui/add_vacation_screen.dart';
+import '../../features/vacations/ui/vacation_detail_screen.dart';
+import '../../features/vacations/ui/add_vacation_activity_screen.dart';
+import '../../features/vacations/models/vacation_model.dart';
+import '../../features/vacations/models/vacation_activity_model.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -191,6 +197,63 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/history',
       builder: (context, state) => const HistoryScreen(),
+    ),
+
+    // --- VACATIONS / LIBURAN MODULE ---
+    GoRoute(
+      path: '/vacations',
+      builder: (context, state) => const VacationListScreen(),
+    ),
+    GoRoute(
+      path: '/partner-vacations',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return VacationListScreen(
+          targetUserId: extra?['targetUserId'] as String?,
+          isReadOnly: true,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-vacation',
+      builder: (context, state) {
+        final vacationToEdit = state.extra as VacationModel?;
+        return AddVacationScreen(initialVacation: vacationToEdit);
+      },
+    ),
+    GoRoute(
+      path: '/vacation-detail',
+      builder: (context, state) {
+        if (state.extra is Map<String, dynamic>) {
+          final extra = state.extra as Map<String, dynamic>;
+          final vacationId = extra['vacationId'] as String;
+          final isReadOnly = (extra['isReadOnly'] as bool?) ?? false;
+          return VacationDetailScreen(
+            vacationId: vacationId,
+            isReadOnly: isReadOnly,
+          );
+        } else {
+          final vacationId = state.extra as String;
+          return VacationDetailScreen(vacationId: vacationId);
+        }
+      },
+    ),
+    GoRoute(
+      path: '/add-vacation-activity',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        final vacationId = extra['vacationId'] as String;
+        final initialActivity =
+            extra['initialActivity'] as VacationActivityModel?;
+        final defaultDate = extra['defaultDate'] as DateTime?;
+        final vacationTitle = extra['vacationTitle'] as String?;
+        return AddVacationActivityScreen(
+          vacationId: vacationId,
+          initialActivity: initialActivity,
+          defaultDate: defaultDate,
+          vacationTitle: vacationTitle,
+        );
+      },
     ),
   ],
 );

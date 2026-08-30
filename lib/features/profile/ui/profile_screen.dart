@@ -9,6 +9,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/supabase_storage_service.dart';
 import '../../../../core/utils/app_snackbar.dart';
 import '../../../../core/widgets/gradient_avatar.dart';
+import '../../../../core/widgets/image_crop_dialog.dart';
+import '../../../../core/widgets/image_source_picker_bottom_sheet.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../home/widgets/cute_home_icon.dart';
 
@@ -24,131 +26,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isUploadingPhoto = false;
 
   Future<void> _showImageSourcePicker() async {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 38,
-                height: 4.5,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Ubah Foto Profil',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Pilih sumber gambar profil Anda',
-              style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-            ),
-            const SizedBox(height: 18),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0088FF).withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.camera_alt_rounded,
-                  color: Color(0xFF0088FF),
-                  size: 22,
-                ),
-              ),
-              title: const Text(
-                'Kamera',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14.5,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              subtitle: const Text(
-                'Ambil foto langsung dengan kamera',
-                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickAndUpload(ImageSource.camera);
-              },
-            ),
-            const Divider(height: 8, color: Color(0xFFF1F5F9)),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.photo_library_rounded,
-                  color: Color(0xFF8B5CF6),
-                  size: 22,
-                ),
-              ),
-              title: const Text(
-                'Galeri',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14.5,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              subtitle: const Text(
-                'Pilih foto dari galeri HP Anda',
-                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickAndUpload(ImageSource.gallery);
-              },
-            ),
-            const SizedBox(height: 10),
-          ],
-        ),
-      ),
+    final source = await ImageSourcePickerBottomSheet.show(
+      context,
+      title: 'Ubah Foto Profil',
+      subtitle: 'Pilih sumber gambar profil Anda',
     );
+    if (source != null) {
+      _pickAndUpload(source);
+    }
   }
 
   Future<void> _pickAndUpload(ImageSource source) async {
     try {
       final XFile? file = await _picker.pickImage(
         source: source,
-        imageQuality: 85,
-        maxWidth: 1024,
-        maxHeight: 1024,
+        imageQuality: 95,
       );
 
       if (file == null) return;
 
+      final rawBytes = await file.readAsBytes();
+      if (!mounted) return;
+
+      // Pure Flutter Interactive Fit & Crop (Square 1:1)
+      final croppedBytes = await ImageCropDialog.show(
+        context,
+        imageBytes: rawBytes,
+        title: 'Sesuaikan Foto Profil',
+        isCircle: false,
+      );
+
+      // User cancelled crop
+      if (croppedBytes == null) return;
+
       setState(() => _isUploadingPhoto = true);
 
-      final bytes = await file.readAsBytes();
-      final ext = file.name.split('.').last.toLowerCase();
-
       final publicUrl = await SupabaseStorageService.uploadUserProfilePicture(
-        bytes,
-        fileExtension: ext.isNotEmpty ? ext : 'jpg',
+        croppedBytes,
+        fileExtension: 'jpg',
       );
 
       if (!mounted) return;
@@ -159,7 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _isUploadingPhoto = false);
 
       if (success) {
-        AppSnackBar.success(context, 'Foto profil berhasil diperbarui!');
+        AppSnackBar.success(context, 'Foto profil berhasil diperbarui! ✨');
       } else {
         AppSnackBar.error(
           context,
@@ -187,7 +102,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         content: const Text(
-          'Apakah Anda yakin ingin keluar dari akun Kita Story?',
+          'Apakah Anda yakin ingin keluar dari akun DayTale?',
           style: TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
         ),
         actions: [
@@ -230,9 +145,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = authProvider.currentUserProfile;
     final partner = authProvider.partnerProfile;
 
-    final userName = user?.name.isNotEmpty == true
-        ? user!.name
-        : 'M. Rafli Agusta R';
+    final userName =
+        user?.name.isNotEmpty == true ? user!.name : 'M. Rafli Agusta R';
     final userPoints = user?.points ?? 100;
     final partnerPoints = partner?.points ?? 0;
     final isUserLeading = userPoints >= partnerPoints;

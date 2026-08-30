@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/app_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/note_model.dart';
 import '../providers/note_provider.dart';
+import '../utils/note_format_helper.dart';
+import '../widgets/widgets.dart';
 
 class NoteDetailScreen extends StatefulWidget {
   final NoteModel note;
@@ -37,6 +40,109 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         .getNoteById(_currentNote.id);
     if (updated != null && mounted) {
       setState(() => _currentNote = updated);
+    }
+  }
+
+  Future<void> _handleExportNote() async {
+    HapticFeedback.mediumImpact();
+    final text = NoteFormatHelper.exportNote(_currentNote);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    AppSnackBar.success(
+      context,
+      'Catatan berhasil disalin ke clipboard! 📋',
+    );
+  }
+
+  Future<void> _handleImportNote() async {
+    final result = await NoteImportBottomSheet.show(
+      context,
+      currentNote: _currentNote,
+    );
+
+    if (result == null || !mounted) return;
+
+    final provider = Provider.of<NoteProvider>(context, listen: false);
+
+    final title = result.updateTitle && result.data.title != null
+        ? result.data.title!
+        : _currentNote.title;
+
+    if (_currentNote.isChecklist || result.data.isChecklist) {
+      final List<Map<String, dynamic>> updatedChecklistItems = [];
+
+      if (!result.replaceExisting) {
+        // Keep existing items
+        for (final item in _currentNote.items) {
+          updatedChecklistItems.add({
+            'item_text': item.itemText,
+            'is_checked': item.isChecked,
+            'checked_by': item.checkedBy,
+          });
+        }
+      }
+
+      // Add imported items
+      for (final item in result.data.checklistItems) {
+        updatedChecklistItems.add({
+          'item_text': item.text,
+          'is_checked': item.isChecked,
+        });
+      }
+
+      final success = await provider.updateNote(
+        _currentNote.id,
+        title: title,
+        type: 'checklist',
+        color: _currentNote.color,
+        isShared: _currentNote.isShared,
+        partnerId: _currentNote.partnerId,
+        checklistItems: updatedChecklistItems,
+      );
+
+      if (!mounted) return;
+      if (success) {
+        AppSnackBar.success(
+          context,
+          'Berhasil mengimpor ${result.data.checklistItems.length} item checklist! 🎉',
+        );
+        _refreshNoteDetails();
+      } else {
+        AppSnackBar.error(
+          context,
+          provider.errorMessage ?? 'Gagal mengimpor catatan',
+        );
+      }
+    } else {
+      // Text note
+      final newContent = result.replaceExisting
+          ? (result.data.textContent ?? '')
+          : '${_currentNote.content ?? ''}\n${result.data.textContent ?? ''}'
+              .trim();
+
+      final success = await provider.updateNote(
+        _currentNote.id,
+        title: title,
+        type: 'text',
+        content: newContent,
+        color: _currentNote.color,
+        isShared: _currentNote.isShared,
+        partnerId: _currentNote.partnerId,
+      );
+
+      if (!mounted) return;
+      if (success) {
+        AppSnackBar.success(
+          context,
+          'Isi catatan berhasil diperbarui dari teks impor! 🎉',
+        );
+        _refreshNoteDetails();
+      } else {
+        AppSnackBar.error(
+          context,
+          provider.errorMessage ?? 'Gagal mengimpor catatan',
+        );
+      }
     }
   }
 
@@ -264,7 +370,29 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           onPressed: () => context.pop(),
         ),
         actions: [
+          // Copy / Export Button (Available for all)
+          IconButton(
+            icon: const Icon(
+              Icons.copy_rounded,
+              color: Color(0xFF1E293B),
+              size: 20,
+            ),
+            tooltip: 'Salin Format Teks / WhatsApp',
+            onPressed: _handleExportNote,
+          ),
+
           if (canEdit) ...[
+            // Import Button
+            IconButton(
+              icon: const Icon(
+                Icons.file_download_outlined,
+                color: Color(0xFF1E293B),
+                size: 22,
+              ),
+              tooltip: 'Impor Teks / WhatsApp',
+              onPressed: _handleImportNote,
+            ),
+
             // Quick Share / Unshare with Partner Button
             if (hasPartner)
               IconButton(
@@ -373,10 +501,96 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               else
                 _buildTextSection(),
 
+              const SizedBox(height: 24),
+
+              // 5. Quick Action Bar (Salin & Impor Teks)
+              _buildQuickActionBar(canEdit),
+
               const SizedBox(height: 40),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionBar(bool canEdit) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: _handleExportNote,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.copy_rounded,
+                      size: 16,
+                      color: Color(0xFF475569),
+                    ),
+                    SizedBox(width: 7),
+                    Text(
+                      'Salin Catatan',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (canEdit) ...[
+            Container(
+              width: 1,
+              height: 22,
+              color: const Color(0xFFCBD5E1),
+            ),
+            Expanded(
+              child: InkWell(
+                onTap: _handleImportNote,
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(
+                        Icons.file_download_outlined,
+                        size: 18,
+                        color: AppColors.primaryPurple,
+                      ),
+                      SizedBox(width: 7),
+                      Text(
+                        'Impor Teks',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryPurple,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

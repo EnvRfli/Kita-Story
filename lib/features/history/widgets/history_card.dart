@@ -178,7 +178,18 @@ class HistoryCard extends StatelessWidget {
     final titleLower = rawTitle.toLowerCase();
     final typeLower = type.toLowerCase();
 
-    // 1. Reading / Progress Update (Green)
+    // 1. Vacation / Travel (Sky Blue)
+    if (typeLower.contains('vacation') ||
+        titleLower.contains('liburan') ||
+        titleLower.contains('agenda')) {
+      return _ActivityVisuals(
+        icon: Icons.flight_takeoff_rounded,
+        iconColor: const Color(0xFF0D8BF0),
+        backgroundColor: const Color(0xFFE0F2FE),
+      );
+    }
+
+    // 2. Reading / Progress Update (Green)
     if (typeLower.contains('progress') ||
         typeLower.contains('read') ||
         titleLower.contains('baca') ||

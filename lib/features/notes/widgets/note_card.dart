@@ -17,106 +17,110 @@ class NoteCard extends StatelessWidget {
     final textColor = note.cardTextColor;
     final checkedColor = note.cardCheckedItemColor;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: bgColor.withValues(alpha: 0.45),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: note.isCompleted ? 0.60 : 1.0,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: bgColor,
           borderRadius: BorderRadius.circular(22),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title + Sparkle & Completed Badge
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${note.title} ✨',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: textColor,
-                          letterSpacing: -0.2,
+          boxShadow: [
+            BoxShadow(
+              color: bgColor.withValues(alpha: note.isCompleted ? 0.20 : 0.45),
+              blurRadius: note.isCompleted ? 8 : 14,
+              offset: Offset(0, note.isCompleted ? 3 : 5),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(22),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title + Sparkle & Completed Badge
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${note.title} ✨',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: textColor,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    if (note.isShared) ...[
-                      Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 2.5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.people_rounded,
-                              size: 11,
-                              color: textColor,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              'Bersama',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
+                      if (note.isShared) ...[
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.people_rounded,
+                                size: 11,
                                 color: textColor,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (note.isCompleted)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'Selesai ✓',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF16A34A),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Bersama',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: textColor,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 10),
+                      ],
+                      if (note.isCompleted)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Selesai ✓',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF16A34A),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
 
-                // Content Preview
-                if (note.isChecklist)
-                  _buildChecklistPreview(textColor, checkedColor)
-                else
-                  _buildTextPreview(textColor),
-              ],
+                  // Content Preview
+                  if (note.isChecklist)
+                    _buildChecklistPreview(textColor, checkedColor)
+                  else
+                    _buildTextPreview(textColor),
+                ],
+              ),
             ),
           ),
         ),
@@ -178,9 +182,8 @@ class NoteCard extends StatelessWidget {
                       color: item.isChecked
                           ? textColor.withValues(alpha: 0.55)
                           : textColor,
-                      decoration: item.isChecked
-                          ? TextDecoration.lineThrough
-                          : null,
+                      decoration:
+                          item.isChecked ? TextDecoration.lineThrough : null,
                       decorationColor: textColor.withValues(alpha: 0.7),
                       decorationThickness: 1.8,
                     ),

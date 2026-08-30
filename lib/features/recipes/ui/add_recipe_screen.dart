@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/services/supabase_storage_service.dart';
 import '../../../../core/utils/app_snackbar.dart';
+import '../../../../core/widgets/image_source_picker_bottom_sheet.dart';
 import '../models/recipe_model.dart';
 import '../providers/recipe_provider.dart';
 
@@ -222,94 +223,17 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     }
   }
 
-  void _showImageSourcePicker({
+  Future<void> _showImageSourcePicker({
     required Function(ImageSource) onSelected,
-  }) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Pilih Sumber Foto',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF7A00).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.camera_alt_rounded,
-                  color: Color(0xFFFF7A00),
-                ),
-              ),
-              title: const Text(
-                'Kamera',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                onSelected(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0088FF).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.photo_library_rounded,
-                  color: Color(0xFF0088FF),
-                ),
-              ),
-              title: const Text(
-                'Galeri',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                onSelected(ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
-      ),
+  }) async {
+    final source = await ImageSourcePickerBottomSheet.show(
+      context,
+      title: 'Pilih Sumber Foto',
+      subtitle: 'Pilih foto masakan dari kamera atau galeri',
     );
+    if (source != null) {
+      onSelected(source);
+    }
   }
 
   Future<void> _handleSave() async {

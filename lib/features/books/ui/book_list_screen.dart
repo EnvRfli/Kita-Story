@@ -29,7 +29,6 @@ class _BookListScreenState extends State<BookListScreen> {
   final BookRepository _repository = BookRepository();
 
   String _selectedFilter = 'all'; // 'all', 'reading', 'completed'
-  bool _showSearchBar = false;
 
   List<BookModel> _partnerBooks = [];
   bool _isLoadingPartner = false;
@@ -336,68 +335,47 @@ class _BookListScreenState extends State<BookListScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Top App Bar
+          // 1. Top Header App Bar
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-            child: Stack(
-              alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            child: Row(
               children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: Color(0xFF1E293B),
-                      size: 22,
-                    ),
-                    onPressed: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      }
-                    },
-                  ),
-                ),
-                Text(
-                  title,
-                  style: const TextStyle(
+                IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
                     color: Color(0xFF1E293B),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 19,
-                    letterSpacing: -0.3,
+                    size: 22,
                   ),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    }
+                  },
                 ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    icon: Icon(
-                      _showSearchBar
-                          ? Icons.search_off_rounded
-                          : Icons.search_rounded,
-                      color: const Color(0xFF1E293B),
-                      size: 22,
+                Expanded(
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF1E293B),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 19,
+                      letterSpacing: -0.3,
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _showSearchBar = !_showSearchBar;
-                        if (!_showSearchBar) {
-                          _searchController.clear();
-                        }
-                      });
-                    },
                   ),
                 ),
+                const SizedBox(width: 48), // Balances leading back button
               ],
             ),
           ),
 
-          // Expandable Search Bar
-          if (_showSearchBar)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: _buildSearchField(),
-            ),
+          // 2. Permanent Search Bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: _buildSearchField(),
+          ),
 
-          // Sticky Filter Pills
+          // 3. Sticky Filter Pills
           _buildFilterChips(
             total: allBooks.length,
             reading: readingCount,
@@ -444,25 +422,24 @@ class _BookListScreenState extends State<BookListScreen> {
 
   Widget _buildSearchField() {
     return Container(
+      height: 48,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.1,
+        ),
       ),
       child: TextField(
         controller: _searchController,
         onChanged: (_) => setState(() {}),
-        autofocus: true,
-        style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+        style: const TextStyle(
+          fontSize: 14,
+          color: Color(0xFF1E293B),
+        ),
         decoration: InputDecoration(
-          hintText: 'Cari judul buku atau penulis...',
+          hintText: 'Cari buku atau penulis...',
           hintStyle: const TextStyle(
             fontSize: 13.5,
             color: Color(0xFF94A3B8),
@@ -477,7 +454,7 @@ class _BookListScreenState extends State<BookListScreen> {
                   icon: const Icon(
                     Icons.close_rounded,
                     color: Color(0xFF94A3B8),
-                    size: 18,
+                    size: 16,
                   ),
                   onPressed: () {
                     _searchController.clear();
@@ -486,14 +463,9 @@ class _BookListScreenState extends State<BookListScreen> {
                 )
               : null,
           border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          errorBorder: InputBorder.none,
-          focusedErrorBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 12,
+            horizontal: 12,
+            vertical: 13,
           ),
         ),
       ),

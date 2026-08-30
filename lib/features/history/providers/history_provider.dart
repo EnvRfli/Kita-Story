@@ -6,16 +6,13 @@ class HistoryProvider extends ChangeNotifier {
   final HistoryRepository _repository = HistoryRepository();
 
   List<ActivityLogModel> _logs = [];
-  List<ActivityLogModel> get logs => _filteredLogs();
+  List<ActivityLogModel> get logs => _logs;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
-
-  String _searchQuery = '';
-  String get searchQuery => _searchQuery;
 
   Future<void> fetchLogs({bool isRefresh = false}) async {
     if (!isRefresh) {
@@ -33,30 +30,5 @@ class HistoryProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
-  }
-
-  void setSearchQuery(String query) {
-    _searchQuery = query;
-    notifyListeners();
-  }
-
-  void clearSearch() {
-    _searchQuery = '';
-    notifyListeners();
-  }
-
-  List<ActivityLogModel> _filteredLogs() {
-    if (_searchQuery.trim().isEmpty) {
-      return _logs;
-    }
-
-    final queryLower = _searchQuery.trim().toLowerCase();
-    return _logs.where((log) {
-      final titleMatch = log.title.toLowerCase().contains(queryLower);
-      final descMatch = log.description.toLowerCase().contains(queryLower);
-      final userMatch =
-          log.userName?.toLowerCase().contains(queryLower) ?? false;
-      return titleMatch || descMatch || userMatch;
-    }).toList();
   }
 }

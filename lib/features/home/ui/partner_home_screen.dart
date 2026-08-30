@@ -441,10 +441,12 @@ class PartnerHomeScreen extends StatelessWidget {
                 imageTop: null,
                 imageBottom: -15,
                 imageWidth: 110,
-                onTap: () => AppSnackBar.info(
-                  context,
-                  'Modul Liburan Pasangan segera hadir! ✈️🏖️',
-                ),
+                onTap: () {
+                  context.push(
+                    '/partner-vacations',
+                    extra: {'targetUserId': partnerId},
+                  );
+                },
               ),
             ),
           ],

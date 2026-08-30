@@ -28,7 +28,12 @@
 * **Kolaborasi Penuh (*Shared Notes*):** Berbagi catatan dengan pasangan di mana kedua pihak dapat mengedit, menambah item checklist, mencentang, dan menghapus bersama.
 * **Drag-and-Drop Reordering:** Mengatur urutan kartu catatan secara bebas dengan penyimpanan urutan lokal & server.
 
-### F. Gamifikasi & Activity Ledger (`lib/core/services/activity_log_service.dart`)
+### F. Liburan & Itinerary Perjalanan (`lib/features/vacations`)
+* **Kalender & Timeline Interaktif:** Menjadwalkan liburan, memilih rentang tanggal, melihat kalender bulanan dengan penanda tanggal aktif dan liburan yang sedang berlangsung.
+* **Timeline Kegiatan Harian:** Mengatur detail aktivitas per hari liburan (waktu mulai - selesai, judul, deskripsi kegiatan) dengan visual timeline garis berakar dan badge waktu oranye.
+* **Smart Filtering & Sorting:** Tab *Semua*, *Sedang Berjalan*, dan *Selesai*. Pengurutan otomatis memprioritaskan liburan yang sedang berlangsung -> mendekati hari H -> masa depan -> selesai ditaruh di bagian terbawah.
+
+### G. Gamifikasi & Activity Ledger (`lib/core/services/activity_log_service.dart`)
 * **Poin Otomatis:** Setiap aktivitas produktif dan kolaboratif menghasilkan poin yang dicatat secara atomik ke tabel `app_users.points` dan `user_point_logs`.
 
 ---
@@ -57,11 +62,13 @@ lib/
 ├── features/
 │   ├── auth/               # Autentikasi & Registrasi
 │   ├── books/              # Library, Progres, Karakter, Snippet, Notes
+│   ├── history/            # Riwayat & Log Aktivitas Pengguna
 │   ├── home/               # Dashboard Utama & Partner Home
 │   ├── notes/              # Catatan Pribadi & Bersama, Checklist
 │   ├── profile/            # Pengaturan Akun & Profil Pasangan
 │   ├── recipes/            # Resep Masakan & Panduan Memasak
-│   └── reminders/          # Pengingat, Notifikasi, & Agenda
+│   ├── reminders/          # Pengingat, Notifikasi, & Agenda
+│   └── vacations/          # Liburan, Kalender, & Itinerary Kegiatan
 ```
 
 ---
@@ -71,21 +78,24 @@ lib/
 | Menu | Aktivitas | `activity_type` | Poin | Judul Log | Deskripsi Log |
 | :--- | :--- | :--- | :---: | :--- | :--- |
 | **Buku** | Tambah Buku Baru | `add_book` | **`+10`** | `Menambah Buku Baru 📖` | `Menambahkan buku "[Judul]"` |
-| **Buku** | Update Halaman Bacaan | `update_progress` | **`+5`** | `Update Bacaan 📑` | `Membaca "[Judul]" hingga hal. [Halaman]` |
-| **Buku** | Tamat Membaca Buku | `finish_book` | **`+30`** | `Tamat Membaca Buku 🎉` | `Menyelesaikan buku "[Judul]"` |
+| **Buku** | Update Halaman Bacaan | `update_progress` | **`+5`** | `Melanjutkan Membaca 🔖` | `Mencapai halaman [Hal] pada buku "[Judul]"` |
+| **Buku** | Tamat Membaca Buku | `finish_book` | **`+30`** | `Menamatkan Buku 🏆` | `Menyelesaikan membaca buku "[Judul]"` |
 | **Buku** | Tulis Ulasan & Rating | `review_book` | **`+5`** | `Menulis Ulasan Buku ⭐` | `Memberikan [Rating]★ pada "[Judul]"` |
-| **Buku** | Tambah Catatan Buku | `add_book_note` | **`+3/catatan`** | `Menulis Catatan Buku 📝` | `Menambahkan [N] catatan pada "[Judul]"` |
-| **Buku** | Tambah Karakter Buku | `add_character` | **`+5`** | `Mendaftarkan Karakter 🎭` | `Menambahkan karakter "[Nama]" ([Role])` |
-| **Buku** | Tambah Galeri Foto | `add_snippet` | **`+5`** | `Menambah Galeri Buku 🖼️` | `Mengunggah foto bacaan pada "[Judul]"` |
-| **Resep** | Buat Resep Baru | `add_recipe` | **`+10`** | `Menambah Resep Baru 🍳` | `Menulis resep "[Judul]" ([Durasi], [Porsi])` |
+| **Buku** | Tambah Catatan Buku | `add_note` | **`+3/catatan`** | `Menambah Catatan 📝` | `Menambahkan [N] catatan pada buku "[Judul]"` |
+| **Buku** | Tambah Karakter Buku | `add_character` | **`+5`** | `Menambah Tokoh Karakter 🎭` | `Mendaftarkan tokoh "[Nama]" pada buku "[Judul]"` |
+| **Buku** | Tambah Galeri Foto | `add_snippet` | **`+5`** | `Menambah Cuplikan Foto 📸` | `Menyimpan cuplikan foto halaman [Hal] pada buku "[Judul]"` |
+| **Resep** | Buat Resep Baru | `add_recipe` | **`+10`** | `Menulis Resep Baru 🍳` | `Menulis resep "[Judul]" ([Durasi], [Porsi])` |
 | **Resep** | Perbarui Resep | `update_recipe` | **`+3`** | `Memperbarui Resep 📝` | `Memperbarui resep masakan "[Judul]"` |
 | **Pengingat** | Buat Pengingat Pribadi | `add_reminder` | **`+5`** | `Membuat Pengingat ⏰` | `Membuat pengingat "[Judul]" untuk [Tanggal]` |
 | **Pengingat** | Buat Pengingat Bersama | `add_shared_reminder`| **`+10`** | `Membuat Pengingat Bersama 💕`| `Berbagi pengingat "[Judul]" dengan pasangan` |
 | **Pengingat** | Selesaikan Pengingat | `complete_reminder` | **`+10`** | `Menyelesaikan Pengingat ✅` | `Menyelesaikan pengingat "[Judul]"` |
 | **Catatan** | Buat Catatan Pribadi | `add_note` | **`+5`** | `Membuat Catatan Baru 📝` | `Membuat catatan "[Judul]"` |
 | **Catatan** | Buat Catatan Bersama | `add_shared_note` | **`+10`** | `Membuat Catatan Bersama 👥` | `Berbagi catatan "[Judul]" dengan pasangan` |
-| **Catatan** | Selesaikan Catatan | `complete_note` | **`+10`** | `Menyelesaikan Catatan 🎉` | `Menyelesaikan seluruh isi catatan` |
-| **Catatan** | Centang Item Checklist | `check_note_item` | **`+1`** | `Checklist Selesai ☑️` | `Mencentang item checklist` |
+| **Catatan** | Selesaikan Catatan | `complete_note` | **`+10`** | `Menyelesaikan Catatan 🎉` | `Menyelesaikan seluruh isi catatan "[Judul]"` |
+| **Catatan** | Centang Item Checklist | `check_note_item` | **`+1`** | `Checklist Selesai ☑️` | `Mencentang "[Item]" pada catatan "[Judul]"` |
+| **Liburan** | Buat Jadwal Liburan | `add_vacation` | **`+10`** | `Menambah Liburan Baru ✈️` | `Menjadwalkan liburan "[Judul]" ([Tgl Mulai] - [Tgl Selesai])` |
+| **Liburan** | Tambah Agenda Kegiatan | `add_vacation_activity` | **`+3`** | `Menambah Agenda Liburan 🏖️` | `Menambahkan agenda "[Aktivitas]" pada liburan "[Judul Liburan]"` |
+| **Liburan** | Selesaikan Agenda | `complete_vacation_activity` | **`+2`** | `Agenda Selesai ✅` | `Menyelesaikan agenda "[Aktivitas]" pada liburan "[Judul Liburan]"` |
 | **Profil** | Ganti Foto Profil | `update_avatar` | **`+5`** | `Ganti Foto Profil 🖼️` | `Memperbarui foto profil akun` |
 
 ---
@@ -240,7 +250,45 @@ CREATE TABLE IF NOT EXISTS note_checklist_items (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 6. Gamification & Activity Ledger
+-- 6. Vacations Module
+CREATE TABLE IF NOT EXISTS vacations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  is_shared BOOLEAN NOT NULL DEFAULT true,
+  partner_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  added_by UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  last_updated_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_vacations_added_by ON vacations(added_by);
+CREATE INDEX IF NOT EXISTS idx_vacations_partner_id ON vacations(partner_id);
+CREATE INDEX IF NOT EXISTS idx_vacations_dates ON vacations(start_date, end_date);
+
+CREATE TABLE IF NOT EXISTS vacation_activities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  vacation_id UUID NOT NULL REFERENCES vacations(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  activity_date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  is_completed BOOLEAN NOT NULL DEFAULT false,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  added_by UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  last_updated_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_vacation_activities_vacation_id ON vacation_activities(vacation_id);
+CREATE INDEX IF NOT EXISTS idx_vacation_activities_date ON vacation_activities(activity_date, start_time);
+
+-- 7. Gamification & Activity Ledger
 CREATE TABLE IF NOT EXISTS user_point_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,

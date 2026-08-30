@@ -15,16 +15,33 @@ class NoteRepository {
     String? targetUserId,
     String? partnerId,
   }) async {
-    final userId = targetUserId ?? currentUserId;
+    final userId = currentUserId;
     if (userId == null) return [];
 
-    final query = targetUserId != null
-        ? _client
-            .from('notes')
-            .select('*, note_checklist_items(*)')
-            .eq('added_by', targetUserId)
-        : _client.from('notes').select('*, note_checklist_items(*)').or(
-            'added_by.eq.$userId,and(is_shared.eq.true,partner_id.eq.$userId)');
+    // Fetch partner ID if not provided and in personal view
+    String? pId = partnerId;
+    if (pId == null && targetUserId == null) {
+      try {
+        final userRec = await _client
+            .from('app_users')
+            .select('partner_id')
+            .eq('id', userId)
+            .maybeSingle();
+        pId = userRec?['partner_id'] as String?;
+      } catch (_) {}
+    }
+
+    var query = _client.from('notes').select('*, note_checklist_items(*)');
+
+    if (targetUserId != null) {
+      query = query.eq('added_by', targetUserId);
+    } else if (pId != null && pId.isNotEmpty) {
+      query = query.or(
+          'added_by.eq.$userId,and(is_shared.eq.true,added_by.eq.$pId),and(is_shared.eq.true,partner_id.eq.$userId)');
+    } else {
+      query = query.or(
+          'added_by.eq.$userId,and(is_shared.eq.true,partner_id.eq.$userId)');
+    }
 
     final response = await query;
 
@@ -42,67 +59,36 @@ class NoteRepository {
       return NoteModel.fromJson(noteJson as Map<String, dynamic>, items: items);
     }).toList();
 
-    // 1. Check local order in SharedPreferences
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedOrder = prefs.getStringList('notes_order_$userId');
-      if (savedOrder != null && savedOrder.isNotEmpty) {
-        final orderMap = {
-          for (int i = 0; i < savedOrder.length; i++) savedOrder[i]: i
-        };
-        notes.sort((a, b) {
-          final orderA = orderMap[a.id];
-          final orderB = orderMap[b.id];
-          if (orderA != null && orderB != null) {
-            return orderA.compareTo(orderB);
-          }
-          if (orderA != null) return -1;
-          if (orderB != null) return 1;
-          if (a.sortOrder != b.sortOrder) {
-            return a.sortOrder.compareTo(b.sortOrder);
-          }
-          return (b.createdAt ?? DateTime.now())
-              .compareTo(a.createdAt ?? DateTime.now());
-        });
-        return notes;
+    // Deterministic Multi-Device Ordering:
+    // Sort strictly by `sort_order` ASC, then `updated_at` / `created_at` DESC
+    notes.sort((a, b) {
+      if (a.sortOrder != b.sortOrder) {
+        return a.sortOrder.compareTo(b.sortOrder);
       }
-    } catch (_) {}
-
-    // 2. Fallback: sort by sortOrder (if defined in Supabase), else createdAt desc
-    final hasCustomSort = notes.any((n) => n.sortOrder > 0);
-    if (hasCustomSort) {
-      notes.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    } else {
-      notes.sort((a, b) => (b.createdAt ?? DateTime.now())
-          .compareTo(a.createdAt ?? DateTime.now()));
-    }
+      final aTime = a.updatedAt ?? a.createdAt ?? DateTime(2000);
+      final bTime = b.updatedAt ?? b.createdAt ?? DateTime(2000);
+      return bTime.compareTo(aTime);
+    });
 
     return notes;
   }
 
-  /// Persist custom reordered notes in SharedPreferences & Supabase
+  /// Persist custom reordered notes in Supabase with clean sequential unique ranks (0, 1, 2...)
   Future<void> updateNotesOrder(
     List<NoteModel> reorderedNotes, {
     String? targetUserId,
   }) async {
     final userId = targetUserId ?? currentUserId;
-    if (userId == null) return;
+    if (userId == null || reorderedNotes.isEmpty) return;
 
-    // 1. Save to SharedPreferences for instant local persistence
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final orderIds = reorderedNotes.map((n) => n.id).toList();
-      await prefs.setStringList('notes_order_$userId', orderIds);
-    } catch (_) {}
-
-    // 2. Persist sort_order column to Supabase
     for (int i = 0; i < reorderedNotes.length; i++) {
       try {
         await _client.from('notes').update({
           'sort_order': i,
+          'last_updated_by': userId,
         }).eq('id', reorderedNotes[i].id);
-      } catch (_) {
-        // Silently skip if sort_order column is pending in DB
+      } catch (e) {
+        // Silently skip if update fails for a single row
       }
     }
   }
@@ -142,7 +128,20 @@ class NoteRepository {
       throw Exception('User tidak terautentikasi.');
     }
 
-    // 1. Insert parent note
+    // 1. Resolve partner ID if shared and partnerId is null
+    String? pId = partnerId;
+    if (isShared && (pId == null || pId.isEmpty)) {
+      try {
+        final userRec = await _client
+            .from('app_users')
+            .select('partner_id')
+            .eq('id', userId)
+            .maybeSingle();
+        pId = userRec?['partner_id'] as String?;
+      } catch (_) {}
+    }
+
+    // 2. Insert parent note
     final noteResponse = await _client
         .from('notes')
         .insert({
@@ -152,7 +151,7 @@ class NoteRepository {
           'color': color ?? 'pink',
           'is_completed': false,
           'is_shared': isShared,
-          'partner_id': isShared ? partnerId : null,
+          'partner_id': isShared ? pId : null,
           'added_by': userId,
           'last_updated_by': userId,
         })
@@ -162,7 +161,7 @@ class NoteRepository {
     final noteId = noteResponse['id'] as String;
     List<ChecklistItemModel> createdItems = [];
 
-    // 2. Insert checklist items if checklist type
+    // 3. Insert checklist items if checklist type
     if (type == 'checklist' &&
         checklistItems != null &&
         checklistItems.isNotEmpty) {
@@ -187,7 +186,7 @@ class NoteRepository {
           .toList();
     }
 
-    // 3. Award Points and record activity log (Shared: +10 pts, Personal: +5 pts)
+    // 4. Award Points and record activity log (Shared: +10 pts, Personal: +5 pts)
     final points = isShared ? 10 : 5;
     await ActivityLogService.recordActivityAndAddPoints(
       userId: userId,
@@ -200,14 +199,6 @@ class NoteRepository {
           : 'Membuat catatan "${title.trim()}"',
       referenceId: noteId,
     );
-
-    // 4. Prepend to local SharedPreferences order
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedOrder = prefs.getStringList('notes_order_$userId') ?? [];
-      savedOrder.insert(0, noteId);
-      await prefs.setStringList('notes_order_$userId', savedOrder);
-    } catch (_) {}
 
     return NoteModel.fromJson(noteResponse, items: createdItems);
   }
@@ -225,6 +216,18 @@ class NoteRepository {
   }) async {
     final userId = currentUserId;
 
+    String? pId = partnerId;
+    if (isShared == true && (pId == null || pId.isEmpty) && userId != null) {
+      try {
+        final userRec = await _client
+            .from('app_users')
+            .select('partner_id')
+            .eq('id', userId)
+            .maybeSingle();
+        pId = userRec?['partner_id'] as String?;
+      } catch (_) {}
+    }
+
     final updateData = <String, dynamic>{
       'title': title.trim(),
       'type': type,
@@ -236,7 +239,7 @@ class NoteRepository {
 
     if (isShared != null) {
       updateData['is_shared'] = isShared;
-      updateData['partner_id'] = isShared ? partnerId : null;
+      updateData['partner_id'] = isShared ? pId : null;
     }
 
     // 1. Update parent note

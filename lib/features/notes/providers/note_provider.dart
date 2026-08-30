@@ -35,16 +35,25 @@ class NoteProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> reorderNotes(int oldIndex, int newIndex, {String? targetUserId}) async {
+  void reorderNotes(int oldIndex, int newIndex) {
     if (oldIndex < newIndex) {
       newIndex -= 1;
     }
     final item = _notes.removeAt(oldIndex);
     _notes.insert(newIndex, item);
     notifyListeners();
+  }
 
-    // Persist order in background to SharedPreferences & Supabase
-    await _repository.updateNotesOrder(_notes, targetUserId: targetUserId);
+  /// Save the current in-memory order of notes to Supabase
+  Future<bool> saveNotesOrder({String? targetUserId}) async {
+    try {
+      await _repository.updateNotesOrder(_notes, targetUserId: targetUserId);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<NoteModel?> getNoteById(String noteId) async {

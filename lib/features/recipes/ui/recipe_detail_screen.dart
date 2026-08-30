@@ -129,11 +129,12 @@ class RecipeDetailScreen extends StatelessWidget {
   }
 
   void _showOptionsBottomSheet(BuildContext context) {
+    if (isReadOnly) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -147,7 +148,7 @@ class RecipeDetailScreen extends StatelessWidget {
                 height: 4,
                 decoration: BoxDecoration(
                   color: const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
@@ -156,22 +157,26 @@ class RecipeDetailScreen extends StatelessWidget {
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0088FF).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.edit_outlined,
-                  color: Color(0xFF0088FF),
+                  color: Color(0xFF3B82F6),
                   size: 20,
                 ),
               ),
               title: const Text(
-                'Ubah Resep',
+                'Edit Resep',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  fontSize: 14.5,
+                  fontSize: 14,
                   color: Color(0xFF1E293B),
                 ),
+              ),
+              subtitle: const Text(
+                'Ubah judul, bahan, cara membuat, dan foto resep',
+                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
               ),
               onTap: () async {
                 Navigator.pop(ctx);
@@ -184,16 +189,17 @@ class RecipeDetailScreen extends StatelessWidget {
                 }
               },
             ),
+            const Divider(height: 8, color: Color(0xFFF1F5F9)),
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF3B30).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.delete_outline_rounded,
-                  color: Color(0xFFFF3B30),
+                  color: Color(0xFFEF4444),
                   size: 20,
                 ),
               ),
@@ -201,9 +207,13 @@ class RecipeDetailScreen extends StatelessWidget {
                 'Hapus Resep',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  fontSize: 14.5,
-                  color: Color(0xFFFF3B30),
+                  fontSize: 14,
+                  color: Color(0xFFEF4444),
                 ),
+              ),
+              subtitle: const Text(
+                'Hapus resep beserta seluruh bahan dan langkahnya',
+                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -461,7 +471,6 @@ class RecipeDetailScreen extends StatelessWidget {
                       '$idx. ',
                       style: const TextStyle(
                         fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
                         color: Color(0xFF1E293B),
                       ),
                     ),
@@ -470,7 +479,6 @@ class RecipeDetailScreen extends StatelessWidget {
                         ingredient.name,
                         style: const TextStyle(
                           fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
                           color: Color(0xFF1E293B),
                         ),
                       ),
@@ -479,7 +487,6 @@ class RecipeDetailScreen extends StatelessWidget {
                       ingredient.quantity,
                       style: const TextStyle(
                         fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
                         color: Color(0xFFFF7A00),
                       ),
                     ),
@@ -540,7 +547,6 @@ class RecipeDetailScreen extends StatelessWidget {
                           '$idx. ',
                           style: const TextStyle(
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
                             color: Color(0xFF1E293B),
                           ),
                         ),
@@ -623,7 +629,6 @@ class RecipeDetailScreen extends StatelessWidget {
           title,
           style: const TextStyle(
             fontSize: 15.5,
-            fontWeight: FontWeight.w800,
             color: Color(0xFF1E293B),
             letterSpacing: -0.2,
           ),

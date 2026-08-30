@@ -88,6 +88,53 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     });
   }
 
+  Future<void> _handleImportInAddScreen() async {
+    final result = await NoteImportBottomSheet.show(context);
+    if (result == null || !mounted) return;
+
+    setState(() {
+      if (result.data.title != null && result.data.title!.trim().isNotEmpty) {
+        _titleController.text = result.data.title!;
+      }
+
+      if (result.data.isChecklist && result.data.checklistItems.isNotEmpty) {
+        _selectedType = 'checklist';
+        if (result.replaceExisting) {
+          for (final c in _checklistControllers) {
+            c.dispose();
+          }
+          _checklistControllers.clear();
+          _checklistCheckedStates.clear();
+        } else {
+          // If first item is empty, clean it up before appending
+          if (_checklistControllers.length == 1 &&
+              _checklistControllers[0].text.trim().isEmpty) {
+            _checklistControllers[0].dispose();
+            _checklistControllers.clear();
+            _checklistCheckedStates.clear();
+          }
+        }
+
+        for (final item in result.data.checklistItems) {
+          _checklistControllers.add(TextEditingController(text: item.text));
+          _checklistCheckedStates.add(item.isChecked);
+        }
+      } else if (result.data.textContent != null) {
+        if (result.replaceExisting || _contentController.text.trim().isEmpty) {
+          _contentController.text = result.data.textContent!;
+        } else {
+          _contentController.text =
+              '${_contentController.text}\n${result.data.textContent}'.trim();
+        }
+      }
+    });
+
+    AppSnackBar.success(
+      context,
+      'Data berhasil dimasukkan dari teks impor! ✨',
+    );
+  }
+
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -158,7 +205,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           checklistItems: validItems,
         );
       } else {
-        final itemTexts = validItems.map((e) => e['item_text'] as String).toList();
+        final itemTexts =
+            validItems.map((e) => e['item_text'] as String).toList();
         success = await provider.createNote(
           title: title,
           type: 'checklist',
@@ -220,6 +268,18 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.file_download_outlined,
+              color: Color(0xFF1E293B),
+              size: 22,
+            ),
+            tooltip: 'Impor Teks / WhatsApp',
+            onPressed: _handleImportInAddScreen,
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -227,7 +287,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -239,8 +300,10 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                         onTypeChanged: (type) {
                           setState(() {
                             _selectedType = type;
-                            if (type == 'checklist' && _checklistControllers.isEmpty) {
-                              _checklistControllers.add(TextEditingController());
+                            if (type == 'checklist' &&
+                                _checklistControllers.isEmpty) {
+                              _checklistControllers
+                                  .add(TextEditingController());
                               _checklistCheckedStates.add(false);
                             }
                           });
@@ -315,7 +378,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: _isShared
-                                  ? const Color(0xFF0088FF).withValues(alpha: 0.5)
+                                  ? const Color(0xFF0088FF)
+                                      .withValues(alpha: 0.5)
                                   : const Color(0xFFE2E8F0),
                               width: 1.2,
                             ),
@@ -354,7 +418,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      partnerName != null && partnerName.isNotEmpty
+                                      partnerName != null &&
+                                              partnerName.isNotEmpty
                                           ? 'Bagikan ke $partnerName, keduanya dapat mengedit & menambah data'
                                           : 'Bagikan ke pasangan, keduanya dapat mengedit & menambah data',
                                       style: const TextStyle(
@@ -497,7 +562,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 GestureDetector(
                   onTap: () {
                     setState(() {
-                      _checklistCheckedStates[index] = !_checklistCheckedStates[index];
+                      _checklistCheckedStates[index] =
+                          !_checklistCheckedStates[index];
                     });
                   },
                   child: Container(
@@ -564,40 +630,81 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         }),
         const SizedBox(height: 8),
 
-        // "+ Tambah Checklist" Button (Orange Outline Pill)
-        InkWell(
-          onTap: _addChecklistItem,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
+        // Checklist Action Buttons (Tambah Checklist & Impor Teks)
+        Row(
+          children: [
+            InkWell(
+              onTap: _addChecklistItem,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: const Color(0xFFFF7A00),
-                width: 1.3,
-              ),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.add_rounded,
-                  color: Color(0xFFFF7A00),
-                  size: 17,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  'Tambah Checklist',
-                  style: TextStyle(
-                    color: Color(0xFFFF7A00),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFFFF7A00),
+                    width: 1.3,
                   ),
                 ),
-              ],
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.add_rounded,
+                      color: Color(0xFFFF7A00),
+                      size: 17,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Tambah Checklist',
+                      style: TextStyle(
+                        color: Color(0xFFFF7A00),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 10),
+            InkWell(
+              onTap: _handleImportInAddScreen,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFFCBD5E1),
+                    width: 1.2,
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.file_download_outlined,
+                      color: Color(0xFF64748B),
+                      size: 17,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Impor Teks',
+                      style: TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

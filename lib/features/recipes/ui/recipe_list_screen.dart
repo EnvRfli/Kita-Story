@@ -50,9 +50,7 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
       final desc = (r.description ?? '').toLowerCase();
       final ingredientMatch =
           r.ingredients.any((i) => i.name.toLowerCase().contains(query));
-      return title.contains(query) ||
-          desc.contains(query) ||
-          ingredientMatch;
+      return title.contains(query) || desc.contains(query) || ingredientMatch;
     }).toList();
   }
 
@@ -83,7 +81,8 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
                 // 1. Header Bar
                 Container(
                   color: const Color(0xFFFCFCFD),
-                  padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                   child: Row(
                     children: [
                       IconButton(
@@ -98,109 +97,74 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
                           }
                         },
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Color(0xFF1E293B),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 19,
-                          letterSpacing: -0.3,
+                      Expanded(
+                        child: Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF1E293B),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 19,
+                            letterSpacing: -0.3,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 48), // Balances leading back button
                     ],
                   ),
                 ),
 
-                // 2. Search Bar with Orange Action Button
+                // 2. Search Bar
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFFE2E8F0),
-                              width: 1.1,
-                            ),
-                          ),
-                          child: TextField(
-                            controller: _searchController,
-                            onChanged: (_) => setState(() {}),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF1E293B),
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Cari resep...',
-                              hintStyle: const TextStyle(
-                                fontSize: 13.5,
-                                color: Color(0xFF94A3B8),
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.search_rounded,
-                                color: Color(0xFF94A3B8),
-                                size: 20,
-                              ),
-                              suffixIcon: _searchController.text.isNotEmpty
-                                  ? IconButton(
-                                      icon: const Icon(
-                                        Icons.close_rounded,
-                                        color: Color(0xFF94A3B8),
-                                        size: 16,
-                                      ),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        setState(() {});
-                                      },
-                                    )
-                                  : null,
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 13,
-                              ),
-                            ),
-                          ),
+                  child: Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFE2E8F0),
+                        width: 1.1,
+                      ),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (_) => setState(() {}),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF1E293B),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Cari resep...',
+                        hintStyle: const TextStyle(
+                          fontSize: 13.5,
+                          color: Color(0xFF94A3B8),
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          color: Color(0xFF94A3B8),
+                          size: 20,
+                        ),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  color: Color(0xFF94A3B8),
+                                  size: 16,
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {});
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 13,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      // Orange Search Button
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF7A00),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFFF7A00)
-                                  .withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () => setState(() {}),
-                            borderRadius: BorderRadius.circular(12),
-                            child: const Center(
-                              child: Icon(
-                                Icons.search_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
 
@@ -349,8 +313,8 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
               const SizedBox(height: 22),
               ElevatedButton.icon(
                 onPressed: _openAddRecipe,
-                icon:
-                    const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                icon: const Icon(Icons.add_rounded,
+                    size: 18, color: Colors.white),
                 label: const Text(
                   'Buat Resep Pertama',
                   style: TextStyle(
