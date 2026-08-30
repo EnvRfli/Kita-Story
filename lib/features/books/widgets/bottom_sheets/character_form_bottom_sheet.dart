@@ -64,13 +64,7 @@ class _CharacterFormBottomSheetState extends State<CharacterFormBottomSheet> {
 
   bool _isSaving = false;
 
-  final List<String> _defaultRoles = [
-    'Main',
-    'Side',
-    'Detektif Kepolisian',
-    'Antagonis',
-    'Korban',
-  ];
+  final List<String> _defaultRoles = [];
 
   @override
   void initState() {

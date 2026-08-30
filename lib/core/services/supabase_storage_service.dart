@@ -8,6 +8,28 @@ class SupabaseStorageService {
   static const String booksCoverBucket = 'books cover';
   static const String charactersProfileBucket = 'characters profile';
   static const String bookSnippetsBucket = 'book snippets';
+  static const String userProfileBucket = 'user profile';
+  static const String recipeImagesBucket = 'recipe images';
+
+  /// Uploads a user profile picture and returns its public URL
+  static Future<String> uploadUserProfilePicture(
+    Uint8List bytes, {
+    String fileExtension = 'jpg',
+    String? contentType,
+  }) async {
+    return _uploadToStorage(
+      primaryBucket: userProfileBucket,
+      fallbackBuckets: const [
+        'user_profile',
+        'user-profile',
+        'profiles',
+        'avatars',
+      ],
+      bytes: bytes,
+      fileExtension: fileExtension,
+      contentType: contentType ?? 'image/jpeg',
+    );
+  }
 
   /// Uploads a book cover image and returns its public URL
   static Future<String> uploadBookCover(
@@ -55,6 +77,25 @@ class SupabaseStorageService {
         'book_snippets',
         'book-snippets',
         'snippets'
+      ],
+      bytes: bytes,
+      fileExtension: fileExtension,
+      contentType: contentType ?? 'image/jpeg',
+    );
+  }
+
+  /// Uploads a recipe cover or step image and returns its public URL
+  static Future<String> uploadRecipeImage(
+    Uint8List bytes, {
+    String fileExtension = 'jpg',
+    String? contentType,
+  }) async {
+    return _uploadToStorage(
+      primaryBucket: recipeImagesBucket,
+      fallbackBuckets: const [
+        'recipe_images',
+        'recipe-images',
+        'recipes',
       ],
       bytes: bytes,
       fileExtension: fileExtension,

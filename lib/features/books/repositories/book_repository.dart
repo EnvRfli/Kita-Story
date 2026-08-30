@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/book_model.dart';
 import '../../../core/network/supabase_client.dart';
+import '../../../core/services/activity_log_service.dart';
 
 class BookRepository {
   final _client = SupabaseNetwork.client;
@@ -32,27 +33,14 @@ class BookRepository {
     required String description,
     String? referenceId,
   }) async {
-    try {
-      await _client.rpc('record_activity_and_add_points', params: {
-        'p_user_id': userId,
-        'p_points': points,
-        'p_activity_type': activityType,
-        'p_title': title,
-        'p_description': description,
-        'p_reference_id': referenceId,
-      });
-    } catch (e) {
-      debugPrint(
-          'Info: RPC record_activity_and_add_points failed, using increment_points fallback: $e');
-      try {
-        await _client.rpc('increment_points', params: {
-          'user_id': userId,
-          'point_amount': points,
-        });
-      } catch (fallbackError) {
-        debugPrint('Warning: Failed to increment points: $fallbackError');
-      }
-    }
+    await ActivityLogService.recordActivityAndAddPoints(
+      userId: userId,
+      points: points,
+      activityType: activityType,
+      title: title,
+      description: description,
+      referenceId: referenceId,
+    );
   }
 
   Future<BookModel> addBook(Map<String, dynamic> bookData) async {
@@ -193,7 +181,10 @@ class BookRepository {
   }
 
   Future<void> addBookNotes(
-      String bookId, List<Map<String, dynamic>> notes) async {
+    String bookId,
+    List<Map<String, dynamic>> notes, {
+    String? bookTitle,
+  }) async {
     final user = _client.auth.currentUser;
     if (user == null || notes.isEmpty) return;
 
@@ -206,13 +197,29 @@ class BookRepository {
       });
     }
 
+    String resolvedTitle = bookTitle ?? '';
+    if (resolvedTitle.isEmpty) {
+      try {
+        final bData = await _client
+            .from('books')
+            .select('title')
+            .eq('id', bookId)
+            .maybeSingle();
+        resolvedTitle = bData?['title'] as String? ?? '';
+      } catch (_) {}
+    }
+
+    final desc = resolvedTitle.isNotEmpty
+        ? 'Menambahkan ${notes.length} catatan pada buku "$resolvedTitle"'
+        : 'Menambahkan ${notes.length} catatan baru';
+
     // Record activity & increment points (+3 pts per note)
     await _recordActivityAndAddPoints(
       userId: user.id,
       points: 3 * notes.length,
       activityType: 'add_note',
       title: 'Menambah Catatan 📝',
-      description: 'Menambahkan ${notes.length} catatan baru pada buku',
+      description: desc,
       referenceId: bookId,
     );
   }
@@ -288,8 +295,9 @@ class BookRepository {
   Future<void> addCharacterWithDetails(
     String bookId,
     Map<String, dynamic> characterData,
-    List<String> traits,
-  ) async {
+    List<String> traits, {
+    String? bookTitle,
+  }) async {
     final user = _client.auth.currentUser;
     if (user == null) return;
 
@@ -337,13 +345,29 @@ class BookRepository {
 
     final charName = characterData['name'] as String? ?? 'Karakter';
 
+    String resolvedTitle = bookTitle ?? '';
+    if (resolvedTitle.isEmpty) {
+      try {
+        final bData = await _client
+            .from('books')
+            .select('title')
+            .eq('id', bookId)
+            .maybeSingle();
+        resolvedTitle = bData?['title'] as String? ?? '';
+      } catch (_) {}
+    }
+
+    final desc = resolvedTitle.isNotEmpty
+        ? 'Mendaftarkan tokoh "$charName" pada buku "$resolvedTitle"'
+        : 'Mendaftarkan tokoh "$charName"';
+
     // Record activity & increment points (+5 pts)
     await _recordActivityAndAddPoints(
       userId: user.id,
       points: 5,
       activityType: 'add_character',
       title: 'Menambah Tokoh Karakter 🎭',
-      description: 'Mendaftarkan tokoh "$charName" pada buku',
+      description: desc,
       referenceId: bookId,
     );
   }
@@ -483,6 +507,7 @@ class BookRepository {
     required String imageUrl,
     String? caption,
     int? pageNumber,
+    String? bookTitle,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) return;
@@ -496,15 +521,36 @@ class BookRepository {
         'added_by': user.id,
       });
 
+      String resolvedTitle = bookTitle ?? '';
+      if (resolvedTitle.isEmpty) {
+        try {
+          final bData = await _client
+              .from('books')
+              .select('title')
+              .eq('id', bookId)
+              .maybeSingle();
+          resolvedTitle = bData?['title'] as String? ?? '';
+        } catch (_) {}
+      }
+
+      final String desc;
+      if (pageNumber != null) {
+        desc = resolvedTitle.isNotEmpty
+            ? 'Menyimpan cuplikan foto halaman $pageNumber pada buku "$resolvedTitle"'
+            : 'Menyimpan cuplikan foto halaman $pageNumber';
+      } else {
+        desc = resolvedTitle.isNotEmpty
+            ? 'Menyimpan cuplikan foto pada buku "$resolvedTitle"'
+            : 'Menyimpan cuplikan foto baru';
+      }
+
       // Record activity & increment points (+5 pts)
       await _recordActivityAndAddPoints(
         userId: user.id,
         points: 5,
         activityType: 'add_snippet',
         title: 'Menambah Cuplikan Foto 📸',
-        description: pageNumber != null
-            ? 'Menyimpan cuplikan foto halaman $pageNumber'
-            : 'Menyimpan cuplikan foto / kutipan baru',
+        description: desc,
         referenceId: bookId,
       );
     } catch (e) {
@@ -549,16 +595,6 @@ class BookRepository {
   // --- Point & Activity Logs ---
 
   Future<List<Map<String, dynamic>>> getActivityLogs({int limit = 20}) async {
-    try {
-      final data = await _client
-          .from('user_point_logs')
-          .select('*, app_users(display_name, photo_url)')
-          .order('created_at', ascending: false)
-          .limit(limit);
-      return List<Map<String, dynamic>>.from(data);
-    } catch (e) {
-      debugPrint('Error fetching activity logs: $e');
-      return [];
-    }
+    return ActivityLogService.getActivityLogs(limit: limit);
   }
 }

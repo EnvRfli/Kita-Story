@@ -9,6 +9,17 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
   final VoidCallback? onEditBook;
   final VoidCallback? onDeleteBook;
   final VoidCallback onBack;
+  final double topPadding;
+  final double screenWidth;
+
+  // --- Content-Derived Component Dimensions ---
+  static const double kCollapsedCoverHeight = 62.0;
+  static const double kCollapsedCoverWidth = 44.0;
+  static const double kCollapsedVerticalPadding = 12.0;
+  static const double kButtonDiameter = 40.0;
+  static const double kExpandedTopMargin = 52.0;
+  static const double kCoverToTextGap = 14.0;
+  static const double kExpandedTextSectionHeight = 125.0;
 
   BookDetailHeaderDelegate({
     required this.book,
@@ -16,7 +27,27 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
     this.onEditBook,
     this.onDeleteBook,
     required this.onBack,
+    required this.topPadding,
+    required this.screenWidth,
   });
+
+  /// Dynamic collapsed toolbar height derived directly from tallest collapsed element + padding
+  double get collapsedToolbarHeight =>
+      kCollapsedCoverHeight + (kCollapsedVerticalPadding * 2); // 62 + 24 = 86.0
+
+  @override
+  double get minExtent => topPadding + collapsedToolbarHeight;
+
+  @override
+  double get maxExtent {
+    final coverStartWidth = (screenWidth * 0.42).clamp(150.0, 175.0);
+    final coverStartHeight = coverStartWidth * 1.38;
+    return topPadding +
+        kExpandedTopMargin +
+        coverStartHeight +
+        kCoverToTextGap +
+        kExpandedTextSectionHeight;
+  }
 
   String _capitalize(String s) {
     if (s.isEmpty) return s;
@@ -121,7 +152,6 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    final topPadding = MediaQuery.of(context).padding.top;
     final screenWidth = MediaQuery.of(context).size.width;
     final maxScroll = maxExtent - minExtent;
     final progress =
@@ -130,24 +160,27 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
     final hasCover = book.coverUrl != null && book.coverUrl!.trim().isNotEmpty;
 
     // --- Dynamic Interpolations for Morphing Layout ---
-    // Smooth Curved Progress
     final morphProgress = Curves.easeInOutCubic.transform(progress);
     final appBarAlpha = Curves.easeIn.transform(
       ((progress - 0.25) / 0.75).clamp(0.0, 1.0),
     );
 
-    // --- Dynamic Interpolations for Morphing Layout ---
-    // Cover card size and position (Adjusted to be larger while maintaining title/author positions)
-    final coverStartWidth = 175.0;
-    final coverStartHeight = 245.0;
-    final coverEndWidth = 45.0;
-    final coverEndHeight = 62.0;
+    // Dynamic measurements based on device width & toolbar metrics
+    final toolbarContentHeight = collapsedToolbarHeight;
+    final buttonTop = topPadding + (toolbarContentHeight - kButtonDiameter) / 2;
+
+    // 1. Cover Dimensions & Coordinates
+    final coverStartWidth = (screenWidth * 0.42).clamp(150.0, 175.0);
+    final coverStartHeight =
+        coverStartWidth * 1.38; // Proportional 1:1.38 aspect ratio
+    const coverEndWidth = kCollapsedCoverWidth;
+    const coverEndHeight = kCollapsedCoverHeight;
 
     final coverStartX = (screenWidth - coverStartWidth) / 2;
-    final coverEndX = 64.0;
+    const coverEndX = 64.0;
 
-    final coverStartY = topPadding + 60.0;
-    final coverEndY = topPadding + 8.0;
+    final coverStartY = topPadding + kExpandedTopMargin;
+    final coverEndY = topPadding + (toolbarContentHeight - coverEndHeight) / 2;
 
     final currentCoverW =
         lerpDouble(coverStartWidth, coverEndWidth, morphProgress)!;
@@ -155,27 +188,27 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
         lerpDouble(coverStartHeight, coverEndHeight, morphProgress)!;
     final currentCoverX = lerpDouble(coverStartX, coverEndX, morphProgress)!;
     final currentCoverY = lerpDouble(coverStartY, coverEndY, morphProgress)!;
-    final currentCoverRadius = lerpDouble(16.0, 8.0, morphProgress)!;
-    final currentCoverShadowAlpha = lerpDouble(0.22, 0.08, morphProgress)!;
+    final currentCoverRadius = lerpDouble(16.0, 6.0, morphProgress)!;
+    final currentCoverShadowAlpha = lerpDouble(0.20, 0.06, morphProgress)!;
 
-    // Text & Genres section position (Preserved cleanly right below cover)
-    final textStartX = 20.0;
-    final textEndX = 122.0;
-    final textStartY = topPadding + 320.0;
-    final textEndY = topPadding + 8.0;
+    // 2. Text Section Coordinates
+    const textStartX = 16.0;
+    const textEndX = 118.0;
+    final textStartY = coverStartY + coverStartHeight + kCoverToTextGap;
+    final textEndY = topPadding + (toolbarContentHeight - 58.0) / 2;
 
     final currentTextX = lerpDouble(textStartX, textEndX, morphProgress)!;
     final currentTextY = lerpDouble(textStartY, textEndY, morphProgress)!;
     final currentTextW =
-        screenWidth - currentTextX - (progress > 0.5 ? 64.0 : 20.0);
+        screenWidth - currentTextX - (progress > 0.5 ? 64.0 : 16.0);
 
-    final titleSize = lerpDouble(19.5, 13.5, morphProgress)!;
+    final titleSize = lerpDouble(19.0, 13.5, morphProgress)!;
     final authorSize = lerpDouble(13.0, 11.0, morphProgress)!;
 
     return Container(
       color: Colors.transparent,
       child: Stack(
-        clipBehavior: Clip.none,
+        clipBehavior: Clip.hardEdge,
         children: [
           // 1. Rich Blurred Cover Artwork Background
           if (hasCover && progress < 0.98)
@@ -190,7 +223,7 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      // Blurred Cover Image (Top Aligned, Rich & Vibrant)
+                      // Blurred Cover Image
                       ImageFiltered(
                         imageFilter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
                         child: Image.network(
@@ -202,22 +235,20 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
                       ),
 
                       // Multi-stop Gradient Melting Seamlessly into Page Background
-                      // Fades to 100% solid at ~280px (stop 0.66 of 420px maxExtent)
-                      // This completely buries the blurred image and prevents ANY bleed lines!
                       Container(
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              Color(0x33000000), // 20% black for button clarity
-                              Color(0x00F8F9FE), // Clear center
-                              Color(0x4DF8F9FE), // 30% background tint
-                              Color(0xCCF8F9FE), // 80% background tint
-                              Color(0xFFF8F9FE), // 100% solid background
-                              Color(0xFFF8F9FE), // 100% solid background
+                              Color(0x33000000),
+                              Color(0x00F8F9FE),
+                              Color(0x4DF8F9FE),
+                              Color(0xCCF8F9FE),
+                              Color(0xFFF8F9FE),
+                              Color(0xFFF8F9FE),
                             ],
-                            stops: [0.0, 0.20, 0.40, 0.58, 0.66, 1.0],
+                            stops: [0.0, 0.20, 0.40, 0.58, 0.68, 1.0],
                           ),
                         ),
                       ),
@@ -250,7 +281,7 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
 
           // 3. Top Action Buttons: Back (Left) & 3-Dots Menu (Right)
           Positioned(
-            top: topPadding + 8,
+            top: buttonTop,
             left: 16,
             child: Container(
               width: 40,
@@ -281,7 +312,7 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
           // 3-Dots Action Button (Right)
           if (onEditBook != null || onDeleteBook != null)
             Positioned(
-              top: topPadding + 8,
+              top: buttonTop,
               right: 16,
               child: Container(
                 width: 40,
@@ -309,7 +340,7 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
               ),
             ),
 
-          // 4. Animating Book Cover (Transitions from center to top-left)
+          // 4. Animating Book Cover (Transitions from center to top-left appbar)
           Positioned(
             top: currentCoverY,
             left: currentCoverX,
@@ -323,15 +354,15 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
                   BoxShadow(
                     color: const Color(0xFF1E293B)
                         .withValues(alpha: currentCoverShadowAlpha),
-                    blurRadius: lerpDouble(22.0, 4.0, morphProgress)!,
-                    offset: Offset(0, lerpDouble(10.0, 2.0, morphProgress)!),
+                    blurRadius: lerpDouble(20.0, 4.0, morphProgress)!,
+                    offset: Offset(0, lerpDouble(8.0, 2.0, morphProgress)!),
                   ),
                   if (progress < 0.5)
                     BoxShadow(
                       color: const Color(0xFF5D5FEF)
-                          .withValues(alpha: 0.12 * (1.0 - progress * 2)),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
+                          .withValues(alpha: 0.10 * (1.0 - progress * 2)),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
                     ),
                 ],
               ),
@@ -349,7 +380,7 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
             ),
           ),
 
-          // 5. Animating Title, Author, & Genre Section (Transitions to right of cover)
+          // 5. Animating Title, Author, & Genre Section (Transitions cleanly to right of cover)
           Positioned(
             top: currentTextY,
             left: currentTextX,
@@ -403,7 +434,7 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
                         return Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
-                            vertical: 6.5,
+                            vertical: 6.0,
                           ),
                           decoration: BoxDecoration(
                             gradient: AppColors.gradientBiru,
@@ -411,7 +442,7 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.gradientBlueStart
-                                    .withValues(alpha: 0.28),
+                                    .withValues(alpha: 0.25),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
@@ -420,7 +451,7 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
                           child: Text(
                             _capitalize(genre),
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 11.5,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
                             ),
@@ -429,7 +460,7 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
                       }).toList(),
                     )
                   else
-                    // Collapsed Compact Genre Row (Right next to author)
+                    // Collapsed Compact Genre Row (Right next to author in appbar)
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
@@ -438,8 +469,8 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
                           return Container(
                             margin: const EdgeInsets.only(right: 6),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 3,
+                              horizontal: 8,
+                              vertical: 2.5,
                             ),
                             decoration: BoxDecoration(
                               gradient: AppColors.gradientBiru,
@@ -448,7 +479,7 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
                             child: Text(
                               _capitalize(genre),
                               style: const TextStyle(
-                                fontSize: 10,
+                                fontSize: 9.5,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
@@ -483,15 +514,11 @@ class BookDetailHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent => 435.0;
-
-  @override
-  double get minExtent => 105.0;
-
-  @override
   bool shouldRebuild(covariant BookDetailHeaderDelegate oldDelegate) {
     return oldDelegate.book != book ||
         oldDelegate.genres != genres ||
+        oldDelegate.topPadding != topPadding ||
+        oldDelegate.screenWidth != screenWidth ||
         oldDelegate.onEditBook != onEditBook ||
         oldDelegate.onDeleteBook != onDeleteBook;
   }

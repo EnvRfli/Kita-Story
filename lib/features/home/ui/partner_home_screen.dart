@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/app_snackbar.dart';
+import '../../../../core/widgets/gradient_avatar.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class PartnerHomeScreen extends StatelessWidget {
@@ -258,39 +259,14 @@ class PartnerHomeScreen extends StatelessWidget {
                         ),
                       ),
 
-                      // Right: Avatar with Glowing Ring
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFF0088FF),
-                              Color(0xFF8B5CF6),
-                            ],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF0088FF)
-                                  .withValues(alpha: 0.40),
-                              blurRadius: 14,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(3),
-                        child: ClipOval(
-                          child: partnerPhotoUrl != null &&
-                                  partnerPhotoUrl.isNotEmpty
-                              ? Image.network(
-                                  partnerPhotoUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      _defaultPartnerAvatar(),
-                                )
-                              : _defaultPartnerAvatar(),
-                        ),
+                      // Right: Avatar with Layered Gradient Ring (Transparent Gap)
+                      GradientAvatar(
+                        photoUrl: partnerPhotoUrl,
+                        size: 85,
+                        strokeWidth: 2.8,
+                        gap: 3.5,
+                        previewTitle: partnerName,
+                        fallback: _defaultPartnerAvatar(),
                       ),
                     ],
                   ),
@@ -376,10 +352,15 @@ class PartnerHomeScreen extends StatelessWidget {
                 imageTop: 10,
                 imageBottom: null,
                 imageWidth: 90,
-                onTap: () => AppSnackBar.info(
-                  context,
-                  'Modul Catatan Pasangan segera hadir! ✨',
-                ),
+                onTap: () {
+                  context.push(
+                    '/partner-notes',
+                    extra: {
+                      'partnerId': partnerId,
+                      'partnerName': partnerName,
+                    },
+                  );
+                },
               ),
             ),
           ],
@@ -412,17 +393,22 @@ class PartnerHomeScreen extends StatelessWidget {
                 imageTop: null,
                 imageBottom: -35,
                 imageWidth: 130,
-                onTap: () => AppSnackBar.info(
-                  context,
-                  'Modul Resep Pasangan segera hadir! 🥧',
-                ),
+                onTap: () {
+                  context.push(
+                    '/partner-recipes',
+                    extra: {
+                      'partnerId': partnerId,
+                      'partnerName': partnerName,
+                    },
+                  );
+                },
               ),
             ),
           ],
         ),
         const SizedBox(height: 14),
 
-        // Row 3: Pengingat (Half width aligned left)
+        // Row 3: Pengingat & Liburan
         Row(
           children: [
             Expanded(
@@ -434,10 +420,50 @@ class PartnerHomeScreen extends StatelessWidget {
                 imageTop: -5,
                 imageBottom: null,
                 imageWidth: 120,
+                onTap: () {
+                  context.push(
+                    '/partner-reminders',
+                    extra: {
+                      'partnerId': partnerId,
+                      'partnerName': partnerName,
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: _buildMenuCard(
+                title: 'Liburan',
+                imagePath:
+                    'lib/assets/homescreen assets/Adobe Express - file 1.png',
+                imageRight: -18,
+                imageTop: null,
+                imageBottom: -15,
+                imageWidth: 110,
                 onTap: () => AppSnackBar.info(
                   context,
-                  'Modul Pengingat Pasangan segera hadir! ⏰',
+                  'Modul Liburan Pasangan segera hadir! ✈️🏖️',
                 ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Row 4: Riwayat
+        Row(
+          children: [
+            Expanded(
+              child: _buildMenuCard(
+                title: 'Riwayat',
+                imagePath:
+                    'lib/assets/homescreen assets/386ff72a-ca85-47aa-9eeb-f38d9ab4c154 2.png',
+                imageRight: -16,
+                imageTop: null,
+                imageBottom: -12,
+                imageWidth: 100,
+                onTap: () => context.push('/history'),
               ),
             ),
             const SizedBox(width: 14),

@@ -1,206 +1,258 @@
-## 1. Executive Summary & Core Context (IMPORTANT FOR AGENT)
+## 1. Executive Summary & Core Context
 
-Proyek ini adalah pembuatan Couple Lifestyle Super-App berbasis Flutter dan Supabase. 
+**Kita Story** adalah Couple Lifestyle Super-App berbasis Flutter dan Supabase yang dirancang dengan arsitektur modular (*Feature-First Clean Architecture*), antarmuka pastel yang imut (*Cute & Soft Aesthetics*), serta sistem gamifikasi (*Point Ledger & Activity Logging*) yang terintegrasi di seluruh fiturnya.
 
-**PERHATIAN UNTUK AGENT:** Aplikasi ini BUKAN sekadar aplikasi pencatat buku. Ini adalah aplikasi modular yang ke depannya akan berisi puluhan modul (Resep Makanan, Travel Planning, Keuangan/Savings, dll). 
+---
 
-Tugas utama Anda saat ini adalah membangun fondasi Clean Architecture (Core: Theme, Network, Utils, Auth) yang sepenuhnya agnostik/independen, lalu mengimplementasikan Modul 1: Book Tracker. Desain UI harus bernuansa pastel (soft color), imut, dan interaktif.
+## 2. Core Modules & User Stories
 
-## 2. Core User Stories (Fase 1 - Book & Auth)
+### A. Auth & Partner Management (`lib/features/auth`, `lib/features/profile`)
+* **Autentikasi & Akun:** Login/Register via Supabase Auth. Setiap pengguna memiliki profil di `app_users` dengan saldo `points`, foto profil, dan relasi pasangan `partner_id`.
+* **Partner Connection:** Menghubungkan akun dengan pasangan sehingga fitur bersama (Catatan Bersama, Pengingat Bersama, dsb.) dapat diakses dua arah secara *real-time*.
 
-*   **Auth:** Pengguna dapat login sederhana menggunakan Nama dan Password.
-*   **Book Management:** Pengguna dapat menambah, mengedit, dan melihat daftar buku (termasuk cover image dari Supabase Storage). Semua aksi mencatat ID pengguna yang melakukan (added_by/updated_by).
-*   **Book Notes (Baru):** Pengguna dapat menambahkan catatan spesifik pada halaman tertentu (Misal: "Halaman 152: Adegan pengakuan cinta").
-*   **Dynamic Tags:** Pengguna dapat membuat Genre Buku dan Sifat Karakter (Traits) baru secara dinamis, yang ditampilkan sebagai pills/chips.
-*   **Character Dex:** Pengguna dapat mendaftarkan karakter yang terikat pada satu buku, beserta foto, peran, halaman kemunculan, dan menghubungkannya dengan banyak Traits (Relasi Many-to-Many).
-*   **Gamification:** Setiap aksi create/update memicu penambahan poin untuk Leaderboard.
+### B. Book Tracker & Library (`lib/features/books`)
+* **Koleksi & Pelacakan:** Menambah buku, mencatat progres halaman bacaan (`current_page` / `total_pages`), ulasan & rating bintang, serta sinopsis.
+* **Karakter & Role Grouping:** Mendaftarkan karakter buku dengan foto, sifat (*traits*), serta pengelompokan role (*Main, Detective, Victim, Supporting*, dll).
+* **Catatan & Galeri Buku:** Menyimpan catatan halaman buku (*Book Notes*) dan foto kutipan bacaan (*Book Snippets*).
+
+### C. Resep Masakan / Cooking Diary (`lib/features/recipes`)
+* **Manajemen Resep:** Menambah dan mengedit resep masakan dengan estimasi durasi memasak, jumlah porsi, daftar bahan (*ingredients*), serta langkah-langkah memasak (*instructions*).
+* **Pratinjau Foto:** Menampilkan foto hasil masakan dengan *interactive pinch & zoom*.
+
+### D. Pengingat & Agenda Bersama (`lib/features/reminders`)
+* **Notifikasi Berjenjang:** Menjadwalkan pengingat dengan notifikasi lokal bertahap (1 Bulan -> 1 Minggu -> 3 Hari -> 1 Hari -> 1 Jam -> Hari H).
+* **Pengingat Bersama Pasangan:** Opsi *Shared Reminder* agar pengingat tersinkronisasi dan dapat diselesaikan bersama pasangan.
+
+### E. Catatan Bersama & Checklist Kolaboratif (`lib/features/notes`)
+* **Tipe Catatan Fleksibel:** Catatan teks biasa atau daftar tugas interaktif (*interactive checklist*).
+* **Kolaborasi Penuh (*Shared Notes*):** Berbagi catatan dengan pasangan di mana kedua pihak dapat mengedit, menambah item checklist, mencentang, dan menghapus bersama.
+* **Drag-and-Drop Reordering:** Mengatur urutan kartu catatan secara bebas dengan penyimpanan urutan lokal & server.
+
+### F. Gamifikasi & Activity Ledger (`lib/core/services/activity_log_service.dart`)
+* **Poin Otomatis:** Setiap aktivitas produktif dan kolaboratif menghasilkan poin yang dicatat secara atomik ke tabel `app_users.points` dan `user_point_logs`.
+
+---
 
 ## 3. Technical Stack & Architecture
 
-*   **Frontend:** Flutter
-*   **State Management:** Provider
-*   **Routing:** go_router
-*   **Backend & DB:** Supabase (PostgreSQL, Auth, Storage)
-*   **Architecture:** Feature-First Clean Architecture
+* **Frontend Framework:** Flutter (Dart)
+* **State Management:** Provider (`ChangeNotifierProvider`, `Consumer`)
+* **Navigation & Routing:** `go_router`
+* **Backend & Database:** Supabase (PostgreSQL, Row Level Security, Auth, Storage)
+* **Design Guidelines:** Pastel Aesthetics, Soft Shadows, Dynamic Spring Animations, Anti-Overflow Responsive Extents
 
+---
 
-## 4. Struktur folder clean architecture
+## 4. Struktur Folder Clean Architecture
 
+```
 lib/
 ├── core/
-│   ├── theme/           # Warna soft/pastel, typography, custom shapes
-│   ├── utils/           # Helper format tanggal, image picker, dll
-│   └── network/         # Konfigurasi Supabase Client
+│   ├── network/            # Konfigurasi Supabase Client
+│   ├── router/             # Konfigurasi go_router
+│   ├── services/           # ActivityLogService, NotificationService, SupabaseStorageService, GeminiOcrService
+│   ├── theme/              # AppColors, AppTheme, Gradients
+│   ├── utils/              # AppSnackBar, Helpers
+│   └── widgets/            # GradientAvatar, BouncyPressable, Reusable UI
 ├── features/
-│   ├── auth/            # Fitur Login Sederhana
-│   │   ├── models/
-│   │   ├── providers/
-│   │   ├── repositories/
-│   │   ├── widgets/     # Reusable custom widgets fitur auth
-│   │   └── ui/
-│   ├── books/           # Fitur Utama Fase 1
-│   │   ├── models/      # BookModel, CharacterModel, GenreModel
-│   │   ├── providers/   # BookProvider (memanggil repository)
-│   │   ├── repositories/# BookRepository (operasi CRUD ke Supabase)
-│   │   ├── widgets/     # Reusable widgets, cards, & bottom sheets buku
-│   │   └── ui/          # BookListScreen, BookDetailScreen, AddBookScreen
-│   ├── home/            # Fitur Halaman Utama
-│   │   ├── widgets/
-│   │   └── ui/
-│   └── leaderboard/     # Fitur Gamifikasi
+│   ├── auth/               # Autentikasi & Registrasi
+│   ├── books/              # Library, Progres, Karakter, Snippet, Notes
+│   ├── home/               # Dashboard Utama & Partner Home
+│   ├── notes/              # Catatan Pribadi & Bersama, Checklist
+│   ├── profile/            # Pengaturan Akun & Profil Pasangan
+│   ├── recipes/            # Resep Masakan & Panduan Memasak
+│   └── reminders/          # Pengingat, Notifikasi, & Agenda
+```
 
+---
 
+## 5. Matriks Poin & Gamifikasi (`user_point_logs`)
 
-## 5. Tema Design (Pastel Aesthetic)
+| Menu | Aktivitas | `activity_type` | Poin | Judul Log | Deskripsi Log |
+| :--- | :--- | :--- | :---: | :--- | :--- |
+| **Buku** | Tambah Buku Baru | `add_book` | **`+10`** | `Menambah Buku Baru 📖` | `Menambahkan buku "[Judul]"` |
+| **Buku** | Update Halaman Bacaan | `update_progress` | **`+5`** | `Update Bacaan 📑` | `Membaca "[Judul]" hingga hal. [Halaman]` |
+| **Buku** | Tamat Membaca Buku | `finish_book` | **`+30`** | `Tamat Membaca Buku 🎉` | `Menyelesaikan buku "[Judul]"` |
+| **Buku** | Tulis Ulasan & Rating | `review_book` | **`+5`** | `Menulis Ulasan Buku ⭐` | `Memberikan [Rating]★ pada "[Judul]"` |
+| **Buku** | Tambah Catatan Buku | `add_book_note` | **`+3/catatan`** | `Menulis Catatan Buku 📝` | `Menambahkan [N] catatan pada "[Judul]"` |
+| **Buku** | Tambah Karakter Buku | `add_character` | **`+5`** | `Mendaftarkan Karakter 🎭` | `Menambahkan karakter "[Nama]" ([Role])` |
+| **Buku** | Tambah Galeri Foto | `add_snippet` | **`+5`** | `Menambah Galeri Buku 🖼️` | `Mengunggah foto bacaan pada "[Judul]"` |
+| **Resep** | Buat Resep Baru | `add_recipe` | **`+10`** | `Menambah Resep Baru 🍳` | `Menulis resep "[Judul]" ([Durasi], [Porsi])` |
+| **Resep** | Perbarui Resep | `update_recipe` | **`+3`** | `Memperbarui Resep 📝` | `Memperbarui resep masakan "[Judul]"` |
+| **Pengingat** | Buat Pengingat Pribadi | `add_reminder` | **`+5`** | `Membuat Pengingat ⏰` | `Membuat pengingat "[Judul]" untuk [Tanggal]` |
+| **Pengingat** | Buat Pengingat Bersama | `add_shared_reminder`| **`+10`** | `Membuat Pengingat Bersama 💕`| `Berbagi pengingat "[Judul]" dengan pasangan` |
+| **Pengingat** | Selesaikan Pengingat | `complete_reminder` | **`+10`** | `Menyelesaikan Pengingat ✅` | `Menyelesaikan pengingat "[Judul]"` |
+| **Catatan** | Buat Catatan Pribadi | `add_note` | **`+5`** | `Membuat Catatan Baru 📝` | `Membuat catatan "[Judul]"` |
+| **Catatan** | Buat Catatan Bersama | `add_shared_note` | **`+10`** | `Membuat Catatan Bersama 👥` | `Berbagi catatan "[Judul]" dengan pasangan` |
+| **Catatan** | Selesaikan Catatan | `complete_note` | **`+10`** | `Menyelesaikan Catatan 🎉` | `Menyelesaikan seluruh isi catatan` |
+| **Catatan** | Centang Item Checklist | `check_note_item` | **`+1`** | `Checklist Selesai ☑️` | `Mencentang item checklist` |
+| **Profil** | Ganti Foto Profil | `update_avatar` | **`+5`** | `Ganti Foto Profil 🖼️` | `Memperbarui foto profil akun` |
 
-* Warna utama: soft pink (#FFD1DC), soft blue (#ADD8E6), mint green (#98FB98), soft yellow (#FFFACD), dan lavender (#E6E6FA).
-* font : inter, roboto, poppins
-* ikon : material icons, fontawesome
-* shadow : box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+---
 
-## 6. Mermaid diagram ERD
-
-erDiagram
-    APP_USERS ||--o{ BOOKS : "manages"
-    APP_USERS ||--o{ BOOK_NOTES : "writes"
-    BOOKS ||--o{ BOOK_NOTES : "has"
-    BOOKS ||--o{ CHARACTERS : "contains"
-    BOOKS ||--o{ BOOK_GENRES : "has"
-    GENRES ||--o{ BOOK_GENRES : "belongs to"
-    CHARACTERS ||--o{ CHARACTER_TRAITS : "has"
-    TRAITS ||--o{ CHARACTER_TRAITS : "belongs to"
-
-    BOOKS {
-        UUID id PK
-        TEXT title
-        INT current_page
-    }
-    BOOK_NOTES {
-        UUID id PK
-        UUID book_id FK
-        INT page_number
-        TEXT note_text
-    }
-    CHARACTERS {
-        UUID id PK
-        UUID book_id FK
-        TEXT name
-    }
-    TRAITS {
-        UUID id PK
-        TEXT name
-    }
-
-
-## 7. Database Schema (Supabase SQL)
+## 6. Database Schema (Supabase PostgreSQL)
 
 ```sql
--- 1. Core & Users
-CREATE TABLE app_users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- 1. Core Users Table
+CREATE TABLE IF NOT EXISTS app_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
+  password_hash TEXT NOT NULL DEFAULT 'managed_by_supabase_auth',
   birthdate DATE,
-  points INT DEFAULT 0,
+  points INTEGER NOT NULL DEFAULT 0,
   photo_url TEXT,
-  partner_id UUID REFERENCES app_users(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  partner_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- 2. Books Module
-CREATE TABLE books (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS books (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   author TEXT,
-  personal_rating INT CHECK (personal_rating >= 1 AND personal_rating <= 5),
+  personal_rating INTEGER CHECK (personal_rating >= 1 AND personal_rating <= 5),
   personal_review TEXT,
   synopsis TEXT,
   cover_url TEXT,
-  total_pages INT NOT NULL,
-  current_page INT DEFAULT 0,
-  added_by UUID REFERENCES app_users(id),
-  last_updated_by UUID REFERENCES app_users(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  total_pages INTEGER NOT NULL DEFAULT 0,
+  current_page INTEGER NOT NULL DEFAULT 0,
+  added_by UUID REFERENCES app_users(id) ON DELETE CASCADE,
+  last_updated_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 3. Notes Module (Many-to-One dengan Books)
-CREATE TABLE book_notes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  book_id UUID REFERENCES books(id) ON DELETE CASCADE,
-  page_number INT NOT NULL,
-  note_text TEXT NOT NULL,
-  added_by UUID REFERENCES app_users(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 4. Dynamic Tags (Genres, Traits, Character Roles)
-CREATE TABLE genres (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS genres (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT UNIQUE NOT NULL,
-  created_by UUID REFERENCES app_users(id)
+  created_by UUID REFERENCES app_users(id) ON DELETE SET NULL
 );
 
-CREATE TABLE traits (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT UNIQUE NOT NULL,
-  created_by UUID REFERENCES app_users(id)
-);
-
-CREATE TABLE character_roles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT UNIQUE NOT NULL,
-  created_by UUID REFERENCES app_users(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 5. Pivot Table Buku <-> Genre
-CREATE TABLE book_genres (
+CREATE TABLE IF NOT EXISTS book_genres (
   book_id UUID REFERENCES books(id) ON DELETE CASCADE,
   genre_id UUID REFERENCES genres(id) ON DELETE CASCADE,
   PRIMARY KEY (book_id, genre_id)
 );
 
--- 6. Characters Module
-CREATE TABLE characters (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS characters (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   book_id UUID REFERENCES books(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  description TEXT,
+  role TEXT,
   photo_url TEXT,
   gender TEXT,
-  role TEXT,
-  first_appearance_page INT,
-  added_by UUID REFERENCES app_users(id)
+  first_appearance_page INTEGER,
+  added_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 7. Pivot Table Karakter <-> Traits
-CREATE TABLE character_traits (
+CREATE TABLE IF NOT EXISTS traits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT UNIQUE NOT NULL,
+  created_by UUID REFERENCES app_users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS character_traits (
   character_id UUID REFERENCES characters(id) ON DELETE CASCADE,
   trait_id UUID REFERENCES traits(id) ON DELETE CASCADE,
   PRIMARY KEY (character_id, trait_id)
 );
 
--- 8. Book Snippets (Quotes & Memorable Moments)
-CREATE TABLE book_snippets (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS book_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  book_id UUID REFERENCES books(id) ON DELETE CASCADE,
+  page_number INTEGER NOT NULL DEFAULT 0,
+  note_text TEXT NOT NULL,
+  added_by UUID REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS book_snippets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   book_id UUID REFERENCES books(id) ON DELETE CASCADE,
   image_url TEXT NOT NULL,
   caption TEXT,
-  page_number INT,
-  added_by UUID REFERENCES app_users(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  page_number INTEGER,
+  added_by UUID REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 9. Gamification & Activity Ledger
-CREATE TABLE user_point_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+-- 3. Recipes Module
+CREATE TABLE IF NOT EXISTS recipes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  image_url TEXT,
+  cooking_duration TEXT NOT NULL,
+  portion_size TEXT NOT NULL,
+  ingredients JSONB NOT NULL DEFAULT '[]'::jsonb,
+  instructions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  added_by UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  last_updated_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 4. Reminders Module
+CREATE TABLE IF NOT EXISTS reminders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  target_date TIMESTAMPTZ NOT NULL,
+  has_custom_time BOOLEAN NOT NULL DEFAULT false,
+  reminder_lead_time TEXT NOT NULL DEFAULT 'on_time',
+  is_shared BOOLEAN NOT NULL DEFAULT false,
+  partner_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  is_completed BOOLEAN NOT NULL DEFAULT false,
+  added_by UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  last_updated_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 5. Notes & Checklists Module
+CREATE TABLE IF NOT EXISTS notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'text',
+  content TEXT,
+  color TEXT NOT NULL DEFAULT 'pink',
+  is_completed BOOLEAN NOT NULL DEFAULT false,
+  completed_at TIMESTAMPTZ,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_shared BOOLEAN NOT NULL DEFAULT false,
+  partner_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  added_by UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  last_updated_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS note_checklist_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  note_id UUID NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+  item_text TEXT NOT NULL,
+  is_checked BOOLEAN NOT NULL DEFAULT false,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  checked_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  checked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 6. Gamification & Activity Ledger
+CREATE TABLE IF NOT EXISTS user_point_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   activity_type TEXT NOT NULL,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
-  points_earned INT NOT NULL,
+  points_earned INTEGER NOT NULL,
   reference_id UUID,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_user_point_logs_created_at ON user_point_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_point_logs_user_id ON user_point_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_point_logs_created_at ON user_point_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_point_logs_activity_type ON user_point_logs(activity_type);
+```

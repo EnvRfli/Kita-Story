@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -48,8 +49,7 @@ class _BookListScreenState extends State<BookListScreen> {
   Future<void> _fetchPartnerBooks() async {
     setState(() => _isLoadingPartner = true);
     try {
-      final books =
-          await _repository.getBooks(targetUserId: widget.partnerId);
+      final books = await _repository.getBooks(targetUserId: widget.partnerId);
       if (mounted) {
         setState(() {
           _partnerBooks = books;
@@ -282,8 +282,7 @@ class _BookListScreenState extends State<BookListScreen> {
                           : filteredBooks.isEmpty
                               ? _buildNoSearchResultsState()
                               : GridView.builder(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(
+                                  physics: const AlwaysScrollableScrollPhysics(
                                     parent: BouncingScrollPhysics(),
                                   ),
                                   padding: const EdgeInsets.fromLTRB(
@@ -430,56 +429,12 @@ class _BookListScreenState extends State<BookListScreen> {
           final isSelected = _selectedFilter == f['id'];
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: InkWell(
+            child: _BouncyFilterChip(
+              label: f['label'] as String,
+              isSelected: isSelected,
               onTap: () {
                 setState(() => _selectedFilter = f['id'] as String);
               },
-              borderRadius: BorderRadius.circular(20),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  gradient: isSelected
-                      ? const LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [
-                            Color(0xFF0088FF),
-                            Color(0xFF0775D5),
-                          ],
-                        )
-                      : null,
-                  color: isSelected ? null : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: isSelected
-                      ? null
-                      : Border.all(
-                          color: const Color(0xFFE2E8F0),
-                          width: 1.2,
-                        ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isSelected
-                          ? const Color(0xFF0088FF).withValues(alpha: 0.28)
-                          : Colors.black.withValues(alpha: 0.03),
-                      blurRadius: isSelected ? 8 : 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  f['label'] as String,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF64748B),
-                    fontWeight:
-                        isSelected ? FontWeight.w700 : FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
             ),
           );
         }).toList(),
@@ -546,6 +501,31 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildNoSearchResultsState() {
+    final query = _searchController.text.trim();
+    final isSearching = query.isNotEmpty;
+
+    IconData icon;
+    String title;
+    String message;
+
+    if (isSearching) {
+      icon = Icons.search_off_rounded;
+      title = 'Tidak Ditemukan';
+      message = 'Tidak ada buku yang cocok dengan "$query".';
+    } else if (_selectedFilter == 'completed') {
+      icon = Icons.check_circle_outline_rounded;
+      title = 'Belum Ada Buku Selesai';
+      message = 'Buku yang sudah selesai dibaca akan muncul di sini.';
+    } else if (_selectedFilter == 'reading') {
+      icon = Icons.menu_book_rounded;
+      title = 'Belum Ada yang Sedang Dibaca';
+      message = 'Buku yang sedang dalam proses membaca akan muncul di sini.';
+    } else {
+      icon = Icons.auto_stories_rounded;
+      title = 'Belum Ada Buku';
+      message = 'Belum ada buku pada kategori ini.';
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -554,20 +534,20 @@ class _BookListScreenState extends State<BookListScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.search_off_rounded,
+              child: Icon(
+                icon,
                 size: 40,
-                color: Color(0xFF94A3B8),
+                color: const Color(0xFF94A3B8),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Tidak Ditemukan',
-              style: TextStyle(
+            Text(
+              title,
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF1E293B),
@@ -575,14 +555,123 @@ class _BookListScreenState extends State<BookListScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Tidak ada buku yang cocok dengan "${_searchController.text.trim()}".',
+              message,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,
                 color: Color(0xFF94A3B8),
+                height: 1.4,
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BouncyFilterChip extends StatefulWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _BouncyFilterChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  State<_BouncyFilterChip> createState() => _BouncyFilterChipState();
+}
+
+class _BouncyFilterChipState extends State<_BouncyFilterChip>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 110),
+      reverseDuration: const Duration(milliseconds: 180),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.93).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+        reverseCurve: Curves.easeOutBack,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _controller.forward(),
+        onTapUp: (_) => _controller.reverse(),
+        onTapCancel: () => _controller.reverse(),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          widget.onTap();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            gradient: widget.isSelected
+                ? const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Color(0xFF0088FF),
+                      Color(0xFF0775D5),
+                    ],
+                  )
+                : null,
+            color: widget.isSelected ? null : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: widget.isSelected
+                ? null
+                : Border.all(
+                    color: const Color(0xFFE2E8F0),
+                    width: 1.2,
+                  ),
+            boxShadow: [
+              BoxShadow(
+                color: widget.isSelected
+                    ? const Color(0xFF0088FF).withValues(alpha: 0.28)
+                    : Colors.black.withValues(alpha: 0.03),
+                blurRadius: widget.isSelected ? 8 : 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            style: TextStyle(
+              color: widget.isSelected ? Colors.white : const Color(0xFF64748B),
+              fontWeight: widget.isSelected ? FontWeight.w700 : FontWeight.w600,
+              fontSize: 13,
+            ),
+            child: Text(widget.label),
+          ),
         ),
       ),
     );

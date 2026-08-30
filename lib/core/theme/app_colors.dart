@@ -44,6 +44,17 @@ class AppColors {
     ],
   );
 
+  // Gradient Avatar Ring (985CF8 atas -> AEBFFF tengah -> 0088FF bawah)
+  static const LinearGradient gradientAvatarRing = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFF985CF8),
+      Color(0xFFAEBFFF),
+      Color(0xFF0088FF),
+    ],
+  );
+
   // Book List Screen Theme Tokens
   static const Color primaryPurple = Color(0xFF5D5FEF);
   static const Color progressOrange = Color(0xFFFF7A00);

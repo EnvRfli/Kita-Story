@@ -155,8 +155,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                   ),
                   content: Text(
                     'Apakah Anda yakin ingin menghapus tokoh "$charName"?',
-                    style:
-                        const TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
+                    style: const TextStyle(
+                        fontSize: 13.5, color: Color(0xFF64748B)),
                   ),
                   actions: [
                     TextButton(
@@ -223,6 +223,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
             _currentBook.id,
             characterData,
             traits,
+            bookTitle: _currentBook.title,
           );
         }
         await _loadDetails(showLoading: false);
@@ -288,11 +289,13 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                   await _repository.deleteBookSnippet(snippet['id'] as String);
                   await _loadDetails(showLoading: false);
                   if (mounted) {
-                    AppSnackBar.success(context, 'Foto galeri berhasil dihapus!');
+                    AppSnackBar.success(
+                        context, 'Foto galeri berhasil dihapus!');
                   }
                 } catch (e) {
                   if (mounted) {
-                    AppSnackBar.error(context, 'Gagal menghapus foto galeri: $e');
+                    AppSnackBar.error(
+                        context, 'Gagal menghapus foto galeri: $e');
                   }
                 }
               }
@@ -319,6 +322,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
             imageUrl: imageUrl,
             caption: caption,
             pageNumber: pageNumber,
+            bookTitle: _currentBook.title,
           );
         }
         await _loadDetails(showLoading: false);
@@ -411,12 +415,15 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                   delegate: BookDetailHeaderDelegate(
                     book: _currentBook,
                     genres: _genres,
+                    topPadding: MediaQuery.of(context).padding.top,
+                    screenWidth: MediaQuery.of(context).size.width,
                     onBack: () => context.pop(),
                     onDeleteBook: widget.isReadOnly ? null : _handleDeleteBook,
                     onEditBook: widget.isReadOnly
                         ? null
                         : () async {
-                            await context.push('/add-book', extra: _currentBook);
+                            await context.push('/add-book',
+                                extra: _currentBook);
                             _loadDetails(showLoading: false);
                           },
                   ),
@@ -432,9 +439,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                         // Reading Progress Card
                         BookProgressCard(
                           book: _currentBook,
-                          onUpdateProgress: widget.isReadOnly
-                              ? null
-                              : _onOpenUpdateProgress,
+                          onUpdateProgress:
+                              widget.isReadOnly ? null : _onOpenUpdateProgress,
                         ),
                         const SizedBox(height: 14),
 
