@@ -114,61 +114,13 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
                   ),
                 ),
 
-                // 2. Search Bar
+                // 2. Permanent Search Bar
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFE2E8F0),
-                        width: 1.1,
-                      ),
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (_) => setState(() {}),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF1E293B),
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Cari resep...',
-                        hintStyle: const TextStyle(
-                          fontSize: 13.5,
-                          color: Color(0xFF94A3B8),
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.search_rounded,
-                          color: Color(0xFF94A3B8),
-                          size: 20,
-                        ),
-                        suffixIcon: _searchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(
-                                  Icons.close_rounded,
-                                  color: Color(0xFF94A3B8),
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() {});
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 13,
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: _buildSearchField(),
                 ),
 
-                // 3. 2-Column Grid / Empty State
+                // 3. 2-Column Grid / Empty State / No Search Results
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: () async {
@@ -187,49 +139,52 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
                               ),
                             ),
                           )
-                        : filteredList.isEmpty
+                        : provider.recipes.isEmpty
                             ? _buildEmptyState()
-                            : GridView.builder(
-                                physics: const AlwaysScrollableScrollPhysics(
-                                  parent: BouncingScrollPhysics(),
-                                ),
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  8,
-                                  16,
-                                  95,
-                                ),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  mainAxisSpacing: 14,
-                                  crossAxisSpacing: 14,
-                                  childAspectRatio: 0.70,
-                                ),
-                                itemCount: filteredList.length,
-                                itemBuilder: (ctx, index) {
-                                  final recipe = filteredList[index];
-                                  return RecipeCard(
-                                    recipe: recipe,
-                                    onTap: () async {
-                                      await context.push(
-                                        '/recipe-detail',
-                                        extra: {
-                                          'recipe': recipe,
-                                          'isReadOnly': widget.isReadOnly,
+                            : filteredList.isEmpty
+                                ? _buildNoSearchResultsState()
+                                : GridView.builder(
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(
+                                      parent: BouncingScrollPhysics(),
+                                    ),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      8,
+                                      16,
+                                      95,
+                                    ),
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      mainAxisSpacing: 14,
+                                      crossAxisSpacing: 14,
+                                      childAspectRatio: 0.70,
+                                    ),
+                                    itemCount: filteredList.length,
+                                    itemBuilder: (ctx, index) {
+                                      final recipe = filteredList[index];
+                                      return RecipeCard(
+                                        recipe: recipe,
+                                        onTap: () async {
+                                          await context.push(
+                                            '/recipe-detail',
+                                            extra: {
+                                              'recipe': recipe,
+                                              'isReadOnly': widget.isReadOnly,
+                                            },
+                                          );
+                                          if (mounted) {
+                                            provider.fetchRecipes(
+                                              targetUserId: widget.isReadOnly
+                                                  ? widget.partnerId
+                                                  : null,
+                                            );
+                                          }
                                         },
                                       );
-                                      if (mounted) {
-                                        provider.fetchRecipes(
-                                          targetUserId: widget.isReadOnly
-                                              ? widget.partnerId
-                                              : null,
-                                        );
-                                      }
                                     },
-                                  );
-                                },
-                              ),
+                                  ),
                   ),
                 ),
               ],
@@ -334,6 +289,101 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.1,
+        ),
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (_) => setState(() {}),
+        style: const TextStyle(
+          fontSize: 14,
+          color: Color(0xFF1E293B),
+        ),
+        decoration: InputDecoration(
+          hintText: 'Cari resep atau bahan...',
+          hintStyle: const TextStyle(
+            fontSize: 13.5,
+            color: Color(0xFF94A3B8),
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF94A3B8),
+            size: 20,
+          ),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF94A3B8),
+                    size: 16,
+                  ),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {});
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoSearchResultsState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.search_off_rounded,
+                size: 38,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Resep Tidak Ditemukan',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Tidak ada resep yang cocok dengan "${_searchController.text.trim()}".',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
           ],
         ),
       ),

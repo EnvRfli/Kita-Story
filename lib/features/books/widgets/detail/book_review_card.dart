@@ -15,7 +15,7 @@ class BookReviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasReview = review != null && review!.trim().isNotEmpty;
-    final currentRating = rating ?? 5;
+    final currentRating = rating ?? 0;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -77,7 +77,7 @@ class BookReviewCard extends StatelessWidget {
           // Star Rating Row
           Row(
             children: List.generate(5, (index) {
-              final isFilled = index < currentRating;
+              final isFilled = rating != null && index < currentRating;
               return Padding(
                 padding: const EdgeInsets.only(right: 4),
                 child: Icon(
@@ -120,4 +120,3 @@ class BookReviewCard extends StatelessWidget {
     );
   }
 }
-

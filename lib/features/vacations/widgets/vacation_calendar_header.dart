@@ -120,7 +120,7 @@ class VacationCalendarHeader extends StatelessWidget {
               Expanded(
                 child: Center(
                   child: Text(
-                    _months[focusedMonth.month - 1],
+                    '${_months[focusedMonth.month - 1]} ${focusedMonth.year}',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,

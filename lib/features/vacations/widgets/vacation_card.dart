@@ -59,8 +59,47 @@ class VacationCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (vacation.isShared) ...[
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              const Color(0xFF0088FF).withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color:
+                                const Color(0xFF0088FF).withValues(alpha: 0.22),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(
+                              Icons.people_rounded,
+                              size: 11.5,
+                              color: Color(0xFF0088FF),
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Bersama',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0088FF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (isInProgress)
                       Container(
+                        margin: const EdgeInsets.only(left: 6),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -78,6 +117,7 @@ class VacationCard extends StatelessWidget {
                       )
                     else if (isCompleted)
                       Container(
+                        margin: const EdgeInsets.only(left: 6),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(

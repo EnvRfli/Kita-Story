@@ -630,81 +630,40 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         }),
         const SizedBox(height: 8),
 
-        // Checklist Action Buttons (Tambah Checklist & Impor Teks)
-        Row(
-          children: [
-            InkWell(
-              onTap: _addChecklistItem,
+        // "+ Tambah Checklist" Button (Orange Outline Pill)
+        InkWell(
+          onTap: _addChecklistItem,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
               borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: const Color(0xFFFF7A00),
-                    width: 1.3,
-                  ),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.add_rounded,
-                      color: Color(0xFFFF7A00),
-                      size: 17,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'Tambah Checklist',
-                      style: TextStyle(
-                        color: Color(0xFFFF7A00),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+              border: Border.all(
+                color: const Color(0xFFFF7A00),
+                width: 1.3,
               ),
             ),
-            const SizedBox(width: 10),
-            InkWell(
-              onTap: _handleImportInAddScreen,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: const Color(0xFFCBD5E1),
-                    width: 1.2,
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.add_rounded,
+                  color: Color(0xFFFF7A00),
+                  size: 17,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  'Tambah Checklist',
+                  style: TextStyle(
+                    color: Color(0xFFFF7A00),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.file_download_outlined,
-                      color: Color(0xFF64748B),
-                      size: 17,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'Impor Teks',
-                      style: TextStyle(
-                        color: Color(0xFF475569),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ],
     );

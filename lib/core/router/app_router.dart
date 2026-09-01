@@ -26,6 +26,7 @@ import '../../features/vacations/ui/vacation_detail_screen.dart';
 import '../../features/vacations/ui/add_vacation_activity_screen.dart';
 import '../../features/vacations/models/vacation_model.dart';
 import '../../features/vacations/models/vacation_activity_model.dart';
+import '../../features/finances/ui/finance_screen.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -252,6 +253,19 @@ final GoRouter appRouter = GoRouter(
           initialActivity: initialActivity,
           defaultDate: defaultDate,
           vacationTitle: vacationTitle,
+        );
+      },
+    ),
+    // --- FINANCE MODULE ---
+    GoRoute(
+      path: '/finance',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final targetUserId = extra?['targetUserId'] as String?;
+        final isPartnerMode = (extra?['isPartnerMode'] as bool?) ?? false;
+        return FinanceScreen(
+          targetUserId: targetUserId,
+          isPartnerMode: isPartnerMode,
         );
       },
     ),

@@ -293,16 +293,25 @@ class _AddBookScreenState extends State<AddBookScreen> {
     setState(() => _isLoading = true);
 
     final provider = Provider.of<BookProvider>(context, listen: false);
-    final bookData = {
+    final bookData = <String, dynamic>{
       'title': title,
       'author': _authorController.text.trim(),
       'cover_url': _coverUrl,
-      'personal_rating': _isEditMode ? (widget.bookToEdit!.personalRating ?? 0) : 0,
       'synopsis': _synopsisController.text.trim(),
-      'personal_review': _isEditMode ? widget.bookToEdit!.personalReview : null,
       'current_page': _isEditMode ? widget.bookToEdit!.currentPage : 0,
       'total_pages': totalPages,
     };
+
+    if (_isEditMode &&
+        widget.bookToEdit!.personalRating != null &&
+        widget.bookToEdit!.personalRating! >= 1 &&
+        widget.bookToEdit!.personalRating! <= 5) {
+      bookData['personal_rating'] = widget.bookToEdit!.personalRating;
+    }
+
+    if (_isEditMode && widget.bookToEdit!.personalReview != null) {
+      bookData['personal_review'] = widget.bookToEdit!.personalReview;
+    }
 
     bool success = false;
 
@@ -536,7 +545,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
                 controller: _synopsisController,
                 minLines: 4,
                 maxLines: 7,
-                style: const TextStyle(fontSize: 13.5, color: Color(0xFF1E293B)),
+                style:
+                    const TextStyle(fontSize: 13.5, color: Color(0xFF1E293B)),
                 decoration: const InputDecoration(
                   hintText: 'Masukkan sinopsis',
                   hintStyle: TextStyle(
@@ -753,7 +763,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444).withValues(alpha: 0.85),
+                          color:
+                              const Color(0xFFEF4444).withValues(alpha: 0.85),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(

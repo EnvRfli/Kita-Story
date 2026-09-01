@@ -87,9 +87,13 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
       backgroundColor: const Color(0xFFFCFCFD),
       body: Consumer<ReminderProvider>(
         builder: (_, provider, __) {
-          final activeList = _filterReminders(provider.activeReminders);
-          final expiredList = _filterReminders(provider.expiredReminders);
-          final totalCount = activeList.length + expiredList.length;
+          final allActive = provider.activeReminders;
+          final allExpired = provider.expiredReminders;
+          final totalAllCount = allActive.length + allExpired.length;
+
+          final activeList = _filterReminders(allActive);
+          final expiredList = _filterReminders(allExpired);
+          final totalFilteredCount = activeList.length + expiredList.length;
 
           return SafeArea(
             bottom: false,
@@ -137,7 +141,7 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                   child: _buildSearchField(),
                 ),
 
-                // 2. Reminders List / Empty State
+                // 3. Reminders List / Empty State / No Search Results
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: () async {
@@ -151,7 +155,7 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                     },
                     color: const Color(0xFFFF7A00),
                     backgroundColor: Colors.white,
-                    child: provider.isLoading && totalCount == 0
+                    child: provider.isLoading && totalAllCount == 0
                         ? const Center(
                             child: CircularProgressIndicator(
                               valueColor: AlwaysStoppedAnimation<Color>(
@@ -159,53 +163,56 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                               ),
                             ),
                           )
-                        : totalCount == 0
+                        : totalAllCount == 0
                             ? _buildEmptyState()
-                            : ListView(
-                                physics: const AlwaysScrollableScrollPhysics(
-                                  parent: BouncingScrollPhysics(),
-                                ),
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  8,
-                                  16,
-                                  95,
-                                ),
-                                children: [
-                                  // Active Reminders
-                                  ...activeList.map((r) => ReminderCard(
-                                        reminder: r,
-                                        onTap: () => _openReminderDetail(
-                                          r,
-                                          activeList,
-                                        ),
-                                      )),
+                            : totalFilteredCount == 0
+                                ? _buildNoSearchResultsState()
+                                : ListView(
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(
+                                      parent: BouncingScrollPhysics(),
+                                    ),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      8,
+                                      16,
+                                      95,
+                                    ),
+                                    children: [
+                                      // Active Reminders
+                                      ...activeList.map((r) => ReminderCard(
+                                            reminder: r,
+                                            onTap: () => _openReminderDetail(
+                                              r,
+                                              activeList,
+                                            ),
+                                          )),
 
-                                  // Expired Reminders (if any)
-                                  if (expiredList.isNotEmpty) ...[
-                                    if (activeList.isNotEmpty)
-                                      const Padding(
-                                        padding:
-                                            EdgeInsets.only(top: 10, bottom: 12),
-                                        child: Text(
-                                          'Telah Lewat / Kadaluarsa',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                            color: Color(0xFF94A3B8),
+                                      // Expired Reminders (if any)
+                                      if (expiredList.isNotEmpty) ...[
+                                        if (activeList.isNotEmpty)
+                                          const Padding(
+                                            padding: EdgeInsets.only(
+                                                top: 10, bottom: 12),
+                                            child: Text(
+                                              'Telah Lewat / Kadaluarsa',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF94A3B8),
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                      ),
-                                    ...expiredList.map((r) => ReminderCard(
-                                          reminder: r,
-                                          onTap: () => _openReminderDetail(
-                                            r,
-                                            expiredList,
-                                          ),
-                                        )),
-                                  ],
-                                ],
-                              ),
+                                        ...expiredList.map((r) => ReminderCard(
+                                              reminder: r,
+                                              onTap: () => _openReminderDetail(
+                                                r,
+                                                expiredList,
+                                              ),
+                                            )),
+                                      ],
+                                    ],
+                                  ),
                   ),
                 ),
               ],
@@ -341,8 +348,8 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
               const SizedBox(height: 22),
               ElevatedButton.icon(
                 onPressed: _openAddReminder,
-                icon:
-                    const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                icon: const Icon(Icons.add_rounded,
+                    size: 18, color: Colors.white),
                 label: const Text(
                   'Buat Pengingat Pertama',
                   style: TextStyle(
@@ -362,6 +369,49 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoSearchResultsState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.search_off_rounded,
+                size: 38,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Pengingat Tidak Ditemukan',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Tidak ada pengingat yang cocok dengan "${_searchController.text.trim()}".',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
           ],
         ),
       ),

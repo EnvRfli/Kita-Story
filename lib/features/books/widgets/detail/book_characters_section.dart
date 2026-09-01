@@ -104,7 +104,30 @@ class _BookCharactersSectionState extends State<BookCharactersSection> {
     );
   }
 
-  /// Groups and orders characters by narrative role priority, then alphabetically
+  int _getAppearancePage(Map<String, dynamic> char) {
+    final val = char['first_appearance_page'];
+    if (val == null) return 999999;
+    if (val is int) return val <= 0 ? 999999 : val;
+    if (val is num) return val <= 0 ? 999999 : val.toInt();
+    if (val is String) {
+      final parsed = int.tryParse(val);
+      return (parsed == null || parsed <= 0) ? 999999 : parsed;
+    }
+    return 999999;
+  }
+
+  int _compareCharacters(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final pageA = _getAppearancePage(a);
+    final pageB = _getAppearancePage(b);
+    if (pageA != pageB) {
+      return pageA.compareTo(pageB); // Smallest page first (left to right)
+    }
+    final nameA = (a['name'] as String? ?? '').toLowerCase();
+    final nameB = (b['name'] as String? ?? '').toLowerCase();
+    return nameA.compareTo(nameB);
+  }
+
+  /// Groups and orders characters by narrative role priority, then by appearance page ascending
   Map<String, List<Map<String, dynamic>>> _getGroupedCharacters(
       List<Map<String, dynamic>> chars) {
     final Map<String, List<Map<String, dynamic>>> grouped = {};
@@ -115,13 +138,9 @@ class _BookCharactersSectionState extends State<BookCharactersSection> {
       grouped.putIfAbsent(key, () => []).add(char);
     }
 
-    // Sort characters alphabetically within each group
+    // Sort characters by appearance page ascending (then alphabetically) within each group
     for (final key in grouped.keys) {
-      grouped[key]!.sort((a, b) {
-        final nameA = (a['name'] as String? ?? '').toLowerCase();
-        final nameB = (b['name'] as String? ?? '').toLowerCase();
-        return nameA.compareTo(nameB);
-      });
+      grouped[key]!.sort(_compareCharacters);
     }
 
     // Sort grouped keys by priority
@@ -138,7 +157,8 @@ class _BookCharactersSectionState extends State<BookCharactersSection> {
 
   @override
   Widget build(BuildContext context) {
-    final allCharacters = widget.characters;
+    final allCharacters = List<Map<String, dynamic>>.from(widget.characters)
+      ..sort(_compareCharacters);
     final groupedAll = _getGroupedCharacters(allCharacters);
     final distinctRoles = groupedAll.keys.toList();
 
@@ -147,11 +167,12 @@ class _BookCharactersSectionState extends State<BookCharactersSection> {
 
     // Filtered by Search Query
     final searchFilteredChars = isSearching
-        ? allCharacters.where((c) {
+        ? (allCharacters.where((c) {
             final name = (c['name'] as String? ?? '').toLowerCase();
             final role = (c['role'] as String? ?? '').toLowerCase();
             return name.contains(query) || role.contains(query);
           }).toList()
+          ..sort(_compareCharacters))
         : allCharacters;
 
     return Container(
@@ -495,42 +516,101 @@ class _BookCharactersSectionState extends State<BookCharactersSection> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Avatar Container
-                      Container(
-                        width: 58,
-                        height: 58,
-                        decoration: BoxDecoration(
-                          color: bgColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: photoUrl.isNotEmpty
-                            ? ClipOval(
-                                child: photoUrl.startsWith('http')
-                                    ? Image.network(
-                                        photoUrl,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) =>
-                                            _buildFallbackAvatar(name),
+                      // Avatar Container with #Page Badge at Top-Right
+                      Builder(
+                        builder: (_) {
+                          final page = _getAppearancePage(char);
+                          final hasPage = page > 0 && page < 999999;
+
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              // Circular Avatar
+                              Container(
+                                width: 58,
+                                height: 58,
+                                decoration: BoxDecoration(
+                                  color: bgColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.06),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: photoUrl.isNotEmpty
+                                    ? ClipOval(
+                                        child: photoUrl.startsWith('http')
+                                            ? Image.network(
+                                                photoUrl,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    _buildFallbackAvatar(name),
+                                              )
+                                            : Image.asset(
+                                                photoUrl.replaceFirst(
+                                                    'asset:', ''),
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    _buildFallbackAvatar(name),
+                                              ),
                                       )
-                                    : Image.asset(
-                                        photoUrl.replaceFirst('asset:', ''),
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) =>
-                                            _buildFallbackAvatar(name),
+                                    : _buildFallbackAvatar(name),
+                              ),
+
+                              // Page Number Badge (#16, #72)
+                              if (hasPage)
+                                Positioned(
+                                  top: -3,
+                                  right: -5,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 1.5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFFFF8A00),
+                                          Color(0xFFFF6A00),
+                                        ],
                                       ),
-                              )
-                            : _buildFallbackAvatar(name),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 1.5,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFFFF8A00)
+                                              .withValues(alpha: 0.40),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 1.5),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      '#$page',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.1,
+                                        letterSpacing: -0.2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 8),
 
@@ -547,7 +627,7 @@ class _BookCharactersSectionState extends State<BookCharactersSection> {
                         ),
                       ),
 
-                      // Character Role
+                      // Character Role Subtitle
                       if (role.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(

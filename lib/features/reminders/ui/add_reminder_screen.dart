@@ -83,19 +83,12 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
+    final initial = _hasCustomTime ? _selectedTime : TimeOfDay.now();
+
+    final picked = await _showWheelTimePicker(
       context: context,
-      initialTime: _selectedTime,
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: Color(0xFFFF7A00),
-            onPrimary: Colors.white,
-            onSurface: Color(0xFF1E293B),
-          ),
-        ),
-        child: child!,
-      ),
+      title: 'Atur Waktu Agenda',
+      initialTime: initial,
     );
 
     if (picked != null) {
@@ -104,6 +97,289 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
         _hasCustomTime = true;
       });
     }
+  }
+
+  Future<TimeOfDay?> _showWheelTimePicker({
+    required BuildContext context,
+    required String title,
+    required TimeOfDay initialTime,
+  }) async {
+    int selectedHour = initialTime.hour;
+    int selectedMinute = initialTime.minute;
+
+    final fixedHourController =
+        FixedExtentScrollController(initialItem: selectedHour);
+    final fixedMinuteController =
+        FixedExtentScrollController(initialItem: selectedMinute);
+
+    return await showModalBottomSheet<TimeOfDay>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Top drag handle
+                  Container(
+                    width: 40,
+                    height: 4.5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(2.5),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Header actions: Batal, Title, Selesai
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, null),
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(
+                            ctx,
+                            TimeOfDay(
+                              hour: selectedHour,
+                              minute: selectedMinute,
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Selesai',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFFF7A00),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Selected Time Preview Banner
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.access_time_rounded,
+                          size: 20,
+                          color: Color(0xFFFF7A00),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${selectedHour.toString().padLeft(2, '0')} : ${selectedMinute.toString().padLeft(2, '0')}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1E293B),
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Column Labels centered above wheels
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          'Jam',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 24),
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          'Menit',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Up-Down Vertical Scroll Wheels for Hours & Minutes
+                  SizedBox(
+                    height: 160,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Central selection indicator container
+                        Container(
+                          width: 200,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color:
+                                const Color(0xFFFF7A00).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: const Color(0xFFFF7A00)
+                                  .withValues(alpha: 0.35),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+
+                        // Wheels Row exactly in center
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Hour Wheel (00 - 23)
+                            SizedBox(
+                              width: 80,
+                              height: 160,
+                              child: ListWheelScrollView.useDelegate(
+                                controller: fixedHourController,
+                                itemExtent: 44,
+                                perspective: 0.003,
+                                diameterRatio: 1.3,
+                                physics: const FixedExtentScrollPhysics(),
+                                onSelectedItemChanged: (index) {
+                                  setModalState(() {
+                                    selectedHour = index;
+                                  });
+                                },
+                                childDelegate: ListWheelChildBuilderDelegate(
+                                  childCount: 24,
+                                  builder: (context, index) {
+                                    final isCurrent = index == selectedHour;
+                                    return Center(
+                                      child: Text(
+                                        index.toString().padLeft(2, '0'),
+                                        style: TextStyle(
+                                          fontSize: isCurrent ? 24 : 17,
+                                          fontWeight: isCurrent
+                                              ? FontWeight.w800
+                                              : FontWeight.w500,
+                                          color: isCurrent
+                                              ? const Color(0xFFFF7A00)
+                                              : const Color(0xFF94A3B8),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            // Separator Colon
+                            const SizedBox(
+                              width: 24,
+                              height: 48,
+                              child: Center(
+                                child: Text(
+                                  ':',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFFF7A00),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Minute Wheel (00 - 59)
+                            SizedBox(
+                              width: 80,
+                              height: 160,
+                              child: ListWheelScrollView.useDelegate(
+                                controller: fixedMinuteController,
+                                itemExtent: 44,
+                                perspective: 0.003,
+                                diameterRatio: 1.3,
+                                physics: const FixedExtentScrollPhysics(),
+                                onSelectedItemChanged: (index) {
+                                  setModalState(() {
+                                    selectedMinute = index;
+                                  });
+                                },
+                                childDelegate: ListWheelChildBuilderDelegate(
+                                  childCount: 60,
+                                  builder: (context, index) {
+                                    final isCurrent = index == selectedMinute;
+                                    return Center(
+                                      child: Text(
+                                        index.toString().padLeft(2, '0'),
+                                        style: TextStyle(
+                                          fontSize: isCurrent ? 24 : 17,
+                                          fontWeight: isCurrent
+                                              ? FontWeight.w800
+                                              : FontWeight.w500,
+                                          color: isCurrent
+                                              ? const Color(0xFFFF7A00)
+                                              : const Color(0xFF94A3B8),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   String _formatDisplayDate(DateTime? date) {

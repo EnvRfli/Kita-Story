@@ -24,7 +24,6 @@ class _VacationListScreenState extends State<VacationListScreen> {
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
 
-  double _dragProgress = 0.0;
   double _currentMinChildSize = 0.45;
   double _currentMaxChildSize = 0.90;
   DateTime? _selectedCalendarDate;
@@ -51,46 +50,52 @@ class _VacationListScreenState extends State<VacationListScreen> {
   @override
   void initState() {
     super.initState();
-    _sheetController.addListener(_onSheetScrolled);
+    _selectedCalendarDate = null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context
-          .read<VacationProvider>()
-          .loadVacations(targetUserId: widget.targetUserId);
+      final provider = context.read<VacationProvider>();
+      provider.resetCalendarAndFilters();
+      provider.loadVacations(targetUserId: widget.targetUserId);
     });
-  }
-
-  void _onSheetScrolled() {
-    if (!_sheetController.isAttached) return;
-    final extent = _sheetController.size;
-    final range = _currentMaxChildSize - _currentMinChildSize;
-    if (range <= 0) return;
-    final progress = ((extent - _currentMinChildSize) / range).clamp(0.0, 1.0);
-    if ((progress - _dragProgress).abs() > 0.005) {
-      setState(() {
-        _dragProgress = progress;
-      });
-    }
   }
 
   @override
   void dispose() {
-    _sheetController.removeListener(_onSheetScrolled);
     _sheetController.dispose();
     super.dispose();
   }
 
+  void _toggleSheet() {
+    if (!_sheetController.isAttached) return;
+    final current = _sheetController.size;
+    final mid = (_currentMinChildSize + _currentMaxChildSize) / 2;
+    final target = current > mid ? _currentMinChildSize : _currentMaxChildSize;
+    _sheetController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final todayDateString = '${now.day} ${_months[now.month - 1]} ${now.year}';
     final statusBarHeight = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0088FF), // Requested 0088FF Blue background
+      backgroundColor: const Color(0xFF0088FF),
       body: Consumer<VacationProvider>(
         builder: (context, provider, child) {
           final vacations = provider.filteredVacations;
           final allVacations = provider.vacations;
+
+          // Dynamic expanded title based on selected date or active focused month
+          final String activeDateTitle;
+          if (_selectedCalendarDate != null) {
+            activeDateTitle =
+                '${_selectedCalendarDate!.day} ${_months[_selectedCalendarDate!.month - 1]} ${_selectedCalendarDate!.year}';
+          } else {
+            activeDateTitle =
+                '${_months[provider.focusedMonth.month - 1]} ${provider.focusedMonth.year}';
+          }
 
           // Dynamically compute calendar height based on number of weeks (4, 5, or 6)
           final firstDayOfMonth = DateTime(
@@ -133,32 +138,47 @@ class _VacationListScreenState extends State<VacationListScreen> {
 
               return Stack(
                 children: [
-                  // 1. Calendar Header Layer (Fades out and translates slightly as sheet slides up)
+                  // 1. Calendar Header Layer (Smooth reactive opacity without triggering parent rebuilds)
                   Positioned(
                     top: statusBarHeight + topBarHeight,
                     left: 0,
                     right: 0,
-                    child: Opacity(
-                      opacity: (1.0 - (_dragProgress * 1.8)).clamp(0.0, 1.0),
-                      child: Transform.translate(
-                        offset: Offset(0, -16.0 * _dragProgress),
-                        child: VacationCalendarHeader(
-                          focusedMonth: provider.focusedMonth,
-                          onPreviousMonth: provider.previousMonth,
-                          onNextMonth: provider.nextMonth,
-                          vacations: allVacations,
-                          selectedDate: _selectedCalendarDate,
-                          onDateSelected: (date) {
-                            setState(() {
-                              if (_selectedCalendarDate != null &&
-                                  _isSameDay(_selectedCalendarDate!, date)) {
-                                _selectedCalendarDate = null;
-                              } else {
-                                _selectedCalendarDate = date;
-                              }
-                            });
-                          },
-                        ),
+                    child: ListenableBuilder(
+                      listenable: _sheetController,
+                      builder: (context, child) {
+                        double progress = 0.0;
+                        if (_sheetController.isAttached) {
+                          final range = maxChildSize - minChildSize;
+                          if (range > 0) {
+                            progress =
+                                ((_sheetController.size - minChildSize) / range)
+                                    .clamp(0.0, 1.0);
+                          }
+                        }
+                        return Opacity(
+                          opacity: (1.0 - (progress * 1.8)).clamp(0.0, 1.0),
+                          child: Transform.translate(
+                            offset: Offset(0, -16.0 * progress),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: VacationCalendarHeader(
+                        focusedMonth: provider.focusedMonth,
+                        onPreviousMonth: provider.previousMonth,
+                        onNextMonth: provider.nextMonth,
+                        vacations: allVacations,
+                        selectedDate: _selectedCalendarDate,
+                        onDateSelected: (date) {
+                          setState(() {
+                            if (_selectedCalendarDate != null &&
+                                _isSameDay(_selectedCalendarDate!, date)) {
+                              _selectedCalendarDate = null;
+                            } else {
+                              _selectedCalendarDate = date;
+                            }
+                          });
+                        },
                       ),
                     ),
                   ),
@@ -176,11 +196,13 @@ class _VacationListScreenState extends State<VacationListScreen> {
                       // Filter by selected calendar date if active
                       List<VacationModel> displayVacations = vacations;
                       if (_selectedCalendarDate != null) {
-                        final sel = DateTime(_selectedCalendarDate!.year,
-                            _selectedCalendarDate!.month, _selectedCalendarDate!.day);
+                        final sel = DateTime(
+                            _selectedCalendarDate!.year,
+                            _selectedCalendarDate!.month,
+                            _selectedCalendarDate!.day);
                         displayVacations = displayVacations.where((v) {
-                          final start = DateTime(
-                              v.startDate.year, v.startDate.month, v.startDate.day);
+                          final start = DateTime(v.startDate.year,
+                              v.startDate.month, v.startDate.day);
                           final end = DateTime(
                               v.endDate.year, v.endDate.month, v.endDate.day);
                           return !sel.isBefore(start) && !sel.isAfter(end);
@@ -203,308 +225,274 @@ class _VacationListScreenState extends State<VacationListScreen> {
                         child: ClipRRect(
                           borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(32)),
-                          child: Column(
-                            children: [
-                              // Interactive Drag Handle & Header Area
-                              GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onVerticalDragUpdate: (details) {
-                                  if (!_sheetController.isAttached) return;
-                                  final delta =
-                                      -details.primaryDelta! / screenHeight;
-                                  final newSize =
-                                      (_sheetController.size + delta)
-                                          .clamp(minChildSize, maxChildSize);
-                                  _sheetController.jumpTo(newSize);
-                                },
-                                onVerticalDragEnd: (details) {
-                                  if (!_sheetController.isAttached) return;
-                                  final mid = (minChildSize + maxChildSize) / 2;
-                                  if (details.primaryVelocity! < -250 ||
-                                      _sheetController.size > mid) {
-                                    _sheetController.animateTo(
-                                      maxChildSize,
-                                      duration:
-                                          const Duration(milliseconds: 250),
-                                      curve: Curves.easeOutCubic,
-                                    );
-                                  } else {
-                                    _sheetController.animateTo(
-                                      minChildSize,
-                                      duration:
-                                          const Duration(milliseconds: 250),
-                                      curve: Curves.easeOutCubic,
-                                    );
-                                  }
-                                },
-                                onTap: () {
-                                  if (!_sheetController.isAttached) return;
-                                  final target = _sheetController.size >
-                                          (minChildSize + 0.1)
-                                      ? minChildSize
-                                      : maxChildSize;
-                                  _sheetController.animateTo(
-                                    target,
-                                    duration: const Duration(milliseconds: 300),
-                                    curve: Curves.easeInOutCubic,
-                                  );
-                                },
-                                child: Column(
-                                  children: [
-                                    // Drag Handle Bar
-                                    Center(
-                                      child: Container(
-                                        width: 38,
-                                        height: 4.5,
-                                        margin: const EdgeInsets.only(
-                                            top: 12, bottom: 8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFCBD5E1),
-                                          borderRadius:
-                                              BorderRadius.circular(3),
+                          child: RefreshIndicator(
+                            color: const Color(0xFF0088FF),
+                            onRefresh: () => provider.loadVacations(
+                              targetUserId: widget.targetUserId,
+                            ),
+                            child: CustomScrollView(
+                              controller: scrollController,
+                              physics: const AlwaysScrollableScrollPhysics(
+                                parent: BouncingScrollPhysics(),
+                              ),
+                              slivers: [
+                                // Header Sliver (Drag handle & Filter tabs)
+                                SliverToBoxAdapter(
+                                  child: Column(
+                                    children: [
+                                      // Drag Handle Bar (Tappable to toggle expand/collapse)
+                                      GestureDetector(
+                                        onTap: _toggleSheet,
+                                        behavior: HitTestBehavior.opaque,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12),
+                                          child: Center(
+                                            child: Container(
+                                              width: 38,
+                                              height: 4.5,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFCBD5E1),
+                                                borderRadius:
+                                                    BorderRadius.circular(3),
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
 
-                                    // Filter Tabs Row
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                          20, 6, 20, 10),
-                                      child: Row(
-                                        children: [
-                                          _buildTabPill(
-                                            context,
-                                            title:
-                                                'Semua (${provider.allCount})',
-                                            isSelected: provider.filterTab ==
-                                                VacationFilterTab.all,
-                                            onTap: () => provider.setFilterTab(
-                                                VacationFilterTab.all),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          _buildTabPill(
-                                            context,
-                                            title:
-                                                'Sedang Berjalan (${provider.inProgressCount})',
-                                            isSelected: provider.filterTab ==
-                                                VacationFilterTab.inProgress,
-                                            onTap: () => provider.setFilterTab(
-                                                VacationFilterTab.inProgress),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          _buildTabPill(
-                                            context,
-                                            title:
-                                                'Selesai (${provider.completedCount})',
-                                            isSelected: provider.filterTab ==
-                                                VacationFilterTab.completed,
-                                            onTap: () => provider.setFilterTab(
-                                                VacationFilterTab.completed),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    // Active Date Filter Banner with Reset Action
-                                    if (_selectedCalendarDate != null)
+                                      // Filter Tabs Row
                                       Padding(
                                         padding: const EdgeInsets.fromLTRB(
                                             20, 0, 20, 10),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 14, vertical: 8),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF0088FF)
-                                                .withValues(alpha: 0.08),
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: const Color(0xFF0088FF)
-                                                  .withValues(alpha: 0.22),
-                                              width: 1.2,
+                                        child: Row(
+                                          children: [
+                                            _buildTabPill(
+                                              context,
+                                              title:
+                                                  'Semua (${provider.allCount})',
+                                              isSelected: provider.filterTab ==
+                                                  VacationFilterTab.all,
+                                              onTap: () =>
+                                                  provider.setFilterTab(
+                                                      VacationFilterTab.all),
                                             ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              const Icon(
-                                                Icons.calendar_today_rounded,
-                                                size: 15,
-                                                color: Color(0xFF0088FF),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: Text(
-                                                  'Tanggal: ${_selectedCalendarDate!.day} ${_months[_selectedCalendarDate!.month - 1]} ${_selectedCalendarDate!.year}',
-                                                  style: const TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Color(0xFF0088FF),
-                                                  ),
-                                                ),
-                                              ),
-                                              GestureDetector(
-                                                onTap: () {
-                                                  setState(() {
-                                                    _selectedCalendarDate = null;
-                                                  });
-                                                },
-                                                child: Container(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 4),
-                                                  decoration: BoxDecoration(
-                                                    color:
-                                                        const Color(0xFF0088FF),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            16),
-                                                  ),
-                                                  child: const Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.refresh_rounded,
-                                                        size: 13,
-                                                        color: Colors.white,
-                                                      ),
-                                                      SizedBox(width: 4),
-                                                      Text(
-                                                        'Reset',
-                                                        style: TextStyle(
-                                                          fontSize: 11.5,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          color: Colors.white,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                            const SizedBox(width: 8),
+                                            _buildTabPill(
+                                              context,
+                                              title:
+                                                  'Sedang Berjalan (${provider.inProgressCount})',
+                                              isSelected: provider.filterTab ==
+                                                  VacationFilterTab.inProgress,
+                                              onTap: () =>
+                                                  provider.setFilterTab(
+                                                      VacationFilterTab
+                                                          .inProgress),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            _buildTabPill(
+                                              context,
+                                              title:
+                                                  'Selesai (${provider.completedCount})',
+                                              isSelected: provider.filterTab ==
+                                                  VacationFilterTab.completed,
+                                              onTap: () =>
+                                                  provider.setFilterTab(
+                                                      VacationFilterTab
+                                                          .completed),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                  ],
-                                ),
-                              ),
 
-                              // Vacation Cards List with Scroll Controller
-                              Expanded(
-                                child: provider.isLoading
-                                    ? const Center(
-                                        child: CircularProgressIndicator(
-                                          color: Color(0xFF0088FF),
-                                        ),
-                                      )
-                                    : provider.errorMessage != null
-                                        ? Center(
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.all(24),
-                                              child: Column(
-                                                mainAxisSize:
-                                                    MainAxisSize.min,
-                                                children: [
-                                                  const Icon(
-                                                    Icons.error_outline_rounded,
-                                                    size: 48,
-                                                    color: Color(0xFFEF4444),
-                                                  ),
-                                                  const SizedBox(height: 12),
-                                                  Text(
-                                                    provider.errorMessage!,
-                                                    textAlign: TextAlign.center,
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF64748B),
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 16),
-                                                  ElevatedButton(
-                                                    style: ElevatedButton
-                                                        .styleFrom(
-                                                      backgroundColor:
-                                                          const Color(
-                                                              0xFF0088FF),
-                                                      shape:
-                                                          RoundedRectangleBorder(
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(12),
-                                                      ),
-                                                    ),
-                                                    onPressed: () =>
-                                                        provider.loadVacations(
-                                                      targetUserId:
-                                                          widget.targetUserId,
-                                                    ),
-                                                    child: const Text(
-                                                      'Coba Lagi',
-                                                      style: TextStyle(
-                                                          color: Colors.white),
-                                                    ),
-                                                  ),
-                                                ],
+                                      // Active Date Filter Banner with Reset Action
+                                      if (_selectedCalendarDate != null)
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                              20, 0, 20, 10),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 14, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF0088FF)
+                                                  .withValues(alpha: 0.08),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: const Color(0xFF0088FF)
+                                                    .withValues(alpha: 0.22),
+                                                width: 1.2,
                                               ),
                                             ),
-                                          )
-                                        : displayVacations.isEmpty
-                                            ? ListView(
-                                                controller: scrollController,
-                                                physics:
-                                                    const AlwaysScrollableScrollPhysics(),
-                                                children: [
-                                                  _buildEmptyState(),
-                                                ],
-                                              )
-                                            : RefreshIndicator(
-                                                color:
-                                                    const Color(0xFF0088FF),
-                                                onRefresh: () =>
-                                                    provider.loadVacations(
-                                                  targetUserId:
-                                                      widget.targetUserId,
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.calendar_today_rounded,
+                                                  size: 15,
+                                                  color: Color(0xFF0088FF),
                                                 ),
-                                                child: ListView.builder(
-                                                  controller: scrollController,
-                                                  padding:
-                                                      const EdgeInsets.fromLTRB(
-                                                          20, 0, 20, 90),
-                                                  itemCount:
-                                                      displayVacations.length,
-                                                  itemBuilder:
-                                                      (context, index) {
-                                                    final vacation =
-                                                        displayVacations[index];
-                                                    return VacationCard(
-                                                      vacation: vacation,
-                                                      onTap: () {
-                                                        context.push(
-                                                          '/vacation-detail',
-                                                          extra: {
-                                                            'vacationId':
-                                                                vacation.id,
-                                                            'isReadOnly': widget
-                                                                .isReadOnly,
-                                                          },
-                                                        );
-                                                      },
-                                                    );
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    'Tanggal: ${_selectedCalendarDate!.day} ${_months[_selectedCalendarDate!.month - 1]} ${_selectedCalendarDate!.year}',
+                                                    style: const TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      color: Color(0xFF0088FF),
+                                                    ),
+                                                  ),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    setState(() {
+                                                      _selectedCalendarDate =
+                                                          null;
+                                                    });
                                                   },
+                                                  child: Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 4),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(
+                                                          0xFF0088FF),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              16),
+                                                    ),
+                                                    child: const Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.refresh_rounded,
+                                                          size: 13,
+                                                          color: Colors.white,
+                                                        ),
+                                                        SizedBox(width: 4),
+                                                        Text(
+                                                          'Reset',
+                                                          style: TextStyle(
+                                                            fontSize: 11.5,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Content Sliver (Loading / Error / Empty / List of Cards)
+                                if (provider.isLoading)
+                                  const SliverFillRemaining(
+                                    hasScrollBody: false,
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        color: Color(0xFF0088FF),
+                                      ),
+                                    ),
+                                  )
+                                else if (provider.errorMessage != null)
+                                  SliverFillRemaining(
+                                    hasScrollBody: false,
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(24),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.error_outline_rounded,
+                                              size: 48,
+                                              color: Color(0xFFEF4444),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              provider.errorMessage!,
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Color(0xFF64748B),
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 16),
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    const Color(0xFF0088FF),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
                                                 ),
                                               ),
-                              ),
-                            ],
+                                              onPressed: () =>
+                                                  provider.loadVacations(
+                                                targetUserId:
+                                                    widget.targetUserId,
+                                              ),
+                                              child: const Text(
+                                                'Coba Lagi',
+                                                style: TextStyle(
+                                                    color: Colors.white),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else if (displayVacations.isEmpty)
+                                  SliverFillRemaining(
+                                    hasScrollBody: false,
+                                    child: _buildEmptyState(),
+                                  )
+                                else
+                                  SliverPadding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        20, 0, 20, 90),
+                                    sliver: SliverList(
+                                      delegate: SliverChildBuilderDelegate(
+                                        (context, index) {
+                                          final vacation =
+                                              displayVacations[index];
+                                          return VacationCard(
+                                            vacation: vacation,
+                                            onTap: () {
+                                              context.push(
+                                                '/vacation-detail',
+                                                extra: {
+                                                  'vacationId': vacation.id,
+                                                  'isReadOnly':
+                                                      widget.isReadOnly,
+                                                },
+                                              );
+                                            },
+                                          );
+                                        },
+                                        childCount: displayVacations.length,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       );
                     },
                   ),
 
-                  // 3. Fixed Top App Bar Layer (Perfect Horizontal Center Cross-Fade)
+                  // 3. Fixed Top App Bar Layer (Perfect Horizontal Center Cross-Fade with ListenableBuilder)
                   Positioned(
                     top: statusBarHeight,
                     left: 0,
@@ -523,39 +511,54 @@ class _VacationListScreenState extends State<VacationListScreen> {
                           ),
                           Expanded(
                             child: Center(
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Title 1: "Liburan" (Resting State)
-                                  Opacity(
-                                    opacity: (1.0 - (_dragProgress * 1.6))
-                                        .clamp(0.0, 1.0),
-                                    child: const Text(
-                                      'Liburan',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                        letterSpacing: -0.2,
+                              child: ListenableBuilder(
+                                listenable: _sheetController,
+                                builder: (context, _) {
+                                  double progress = 0.0;
+                                  if (_sheetController.isAttached) {
+                                    final range = maxChildSize - minChildSize;
+                                    if (range > 0) {
+                                      progress = ((_sheetController.size -
+                                                  minChildSize) /
+                                              range)
+                                          .clamp(0.0, 1.0);
+                                    }
+                                  }
+                                  return Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // Title 1: "Liburan" (Resting State)
+                                      Opacity(
+                                        opacity: (1.0 - (progress * 1.6))
+                                            .clamp(0.0, 1.0),
+                                        child: const Text(
+                                          'Liburan',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                            letterSpacing: -0.2,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
 
-                                  // Title 2: "30 Agustus 2026" (Expanded State)
-                                  Opacity(
-                                    opacity: ((_dragProgress - 0.2) * 1.6)
-                                        .clamp(0.0, 1.0),
-                                    child: Text(
-                                      todayDateString,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                        letterSpacing: -0.2,
+                                      // Title 2: Dynamic Month / Date (Expanded State)
+                                      Opacity(
+                                        opacity: ((progress - 0.2) * 1.6)
+                                            .clamp(0.0, 1.0),
+                                        child: Text(
+                                          activeDateTitle,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                            letterSpacing: -0.2,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                ],
+                                    ],
+                                  );
+                                },
                               ),
                             ),
                           ),
@@ -697,7 +700,8 @@ class _VacationListScreenState extends State<VacationListScreen> {
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF0088FF),
-                    side: const BorderSide(color: Color(0xFF0088FF), width: 1.2),
+                    side:
+                        const BorderSide(color: Color(0xFF0088FF), width: 1.2),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

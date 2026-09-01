@@ -8,6 +8,7 @@ import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/supabase_storage_service.dart';
 import '../../../../core/utils/app_snackbar.dart';
+import '../../../../core/widgets/badge_bubble_tooltip.dart';
 import '../../../../core/widgets/gradient_avatar.dart';
 import '../../../../core/widgets/image_crop_dialog.dart';
 import '../../../../core/widgets/image_source_picker_bottom_sheet.dart';
@@ -28,25 +29,52 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late int _currentNavIndex;
   final ImagePicker _picker = ImagePicker();
   bool _isUploadingPhoto = false;
 
+  // Global Keys for 3D Badge Interactive Tooltip Attachments
+  final GlobalKey _homePointKey = GlobalKey();
+  final GlobalKey _homeShieldKey = GlobalKey();
+  final GlobalKey _profilePointKey = GlobalKey();
+  final GlobalKey _profileShieldKey = GlobalKey();
+  final GlobalKey _partnerPointKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentNavIndex = widget.initialIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.refreshProfile();
-      if (!mounted) return;
-      final reminderProvider =
-          Provider.of<ReminderProvider>(context, listen: false);
-      await reminderProvider.fetchReminders(
-        partnerId: authProvider.partnerProfile?.id,
-      );
-      if (!mounted) return;
+      await _refreshAllData(showPopupIfNeeded: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _refreshAllData();
+    }
+  }
+
+  Future<void> _refreshAllData({bool showPopupIfNeeded = false}) async {
+    if (!mounted) return;
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.refreshProfile();
+    if (!mounted) return;
+    final reminderProvider =
+        Provider.of<ReminderProvider>(context, listen: false);
+    await reminderProvider.fetchReminders(
+      partnerId: authProvider.partnerProfile?.id,
+    );
+    if (showPopupIfNeeded && mounted) {
       final shouldShow = await reminderProvider.shouldShowDailyPopup();
       if (shouldShow &&
           reminderProvider.upcomingReminders.isNotEmpty &&
@@ -57,7 +85,107 @@ class _HomeScreenState extends State<HomeScreen> {
           isDailyPopup: true,
         );
       }
-    });
+    }
+  }
+
+  Future<void> _navigateTo(String route) async {
+    await context.push(route);
+    if (mounted) {
+      _refreshAllData();
+    }
+  }
+
+  void _showPointBadgeTooltip({
+    required GlobalKey key,
+    required int points,
+    bool isPartner = false,
+    String? partnerName,
+  }) {
+    final name = isPartner ? (partnerName ?? 'Pasangan') : 'Kamu';
+    showBadgeBubbleTooltip(
+      context: context,
+      targetKey: key,
+      title: 'Poin Aktivitas ✨',
+      badgeLabel: 'Total: $points Poin',
+      gradientColors: const [Color(0xFF6B55F5), Color(0xFF4C8DF5)],
+      icon: Image.asset(
+        'lib/assets/homescreen assets/7068473 3.png',
+        width: 20,
+        height: 20,
+        errorBuilder: (_, __, ___) => const Icon(
+          Icons.stars_rounded,
+          color: Colors.amberAccent,
+          size: 20,
+        ),
+      ),
+      description: isPartner
+          ? 'Ini adalah total poin yang telah dikumpulkan oleh $name dari berbagai aktivitas seperti membaca buku, menyelesaikan checklist catatan, resep, dan liburan.'
+          : 'Poin ini melambangkan kontribusi dan keaktifan di aplikasi! Setiap kali kamu membaca buku, mencentang checklist, menambah resep, atau merencanakan liburan, poinmu akan bertambah.',
+      footerTip: isPartner
+          ? 'Beri semangat $name untuk terus mengumpulkan poin!'
+          : 'Tips: Checklist (+1), Catatan Baru (+5), Selesai Catatan (+10)!',
+    );
+  }
+
+  void _showShieldBadgeTooltip({
+    required GlobalKey key,
+    required bool isLeading,
+    required int userPoints,
+    required int partnerPoints,
+    required String partnerName,
+  }) {
+    final diffPoints = (userPoints - partnerPoints).abs();
+    final pointComparison = userPoints >= partnerPoints
+        ? (userPoints == partnerPoints
+            ? 'Poin seimbang dengan $partnerName ($userPoints Poin)!'
+            : 'Memimpin +$diffPoints poin di atas $partnerName!')
+        : 'Tertinggal -$diffPoints poin di bawah $partnerName.';
+
+    if (isLeading) {
+      showBadgeBubbleTooltip(
+        context: context,
+        targetKey: key,
+        title: 'Shield 🏆',
+        badgeLabel: 'Rank: Pemimpin Poin',
+        gradientColors: const [Color(0xFFFF8A00), Color(0xFFFF5E00)],
+        icon: Image.asset(
+          'lib/assets/homescreen assets/7068473 3 (1).png',
+          width: 22,
+          height: 22,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.shield_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+        description:
+            'Hebat sekali! Kamu saat ini menyandang Shield karena memiliki perolehan poin tertinggi ($userPoints Poin). Pertahankan terus posisimu!',
+        footerTip: pointComparison,
+      );
+    } else {
+      showBadgeBubbleTooltip(
+        context: context,
+        targetKey: key,
+        title: 'Shield 🛡️',
+        badgeLabel: 'Rank: Penantang Setia',
+        gradientColors: const [Color(0xFFFF8A00), Color(0xFFFF5E00)],
+        icon: Image.asset(
+          'lib/assets/homescreen assets/7068473 3 (2).png',
+          width: 22,
+          height: 22,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.shield_outlined,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+        description:
+            'Saat ini $partnerName sedang memegang Shield Emas ($partnerPoints Poin). Ayo selesaikan lebih banyak aktivitas & checklist untuk merebut kembali Shield Emas!',
+        footerTip: pointComparison,
+      );
+    }
   }
 
   Future<void> _showImageSourcePicker() async {
@@ -239,6 +367,8 @@ class _HomeScreenState extends State<HomeScreen> {
               userPoints: userPoints,
               userPhotoUrl: currentUser?.photoUrl,
               isUserLeading: isUserLeading,
+              partnerName: partnerName,
+              partnerPoints: partnerPoints,
             ),
         ],
       ),
@@ -298,49 +428,58 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // Scrollable Body
+        // Scrollable Body with Pull-to-Refresh
         SafeArea(
           bottom: false,
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20.0, 64.0, 20.0, 115.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top Header
-                _buildHeader(
-                  context: context,
-                  userName: userName,
-                  userPoints: userPoints,
-                  userPhotoUrl: userPhotoUrl,
-                  isUserLeading: isUserLeading,
-                ),
-                const SizedBox(height: 40),
-
-                // Partner Card
-                _buildPartnerCard(
-                  context: context,
-                  partnerName: partnerName,
-                  partnerPhotoUrl: partnerPhotoUrl,
-                  partnerPoints: partnerPoints,
-                ),
-                const SizedBox(height: 28),
-
-                // Section Title
-                const Text(
-                  'Jelajahi ✨',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF222222),
-                    letterSpacing: -0.3,
+          child: RefreshIndicator(
+            color: const Color(0xFF0088FF),
+            backgroundColor: Colors.white,
+            onRefresh: _refreshAllData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              padding: const EdgeInsets.fromLTRB(20.0, 64.0, 20.0, 115.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top Header
+                  _buildHeader(
+                    context: context,
+                    userName: userName,
+                    userPoints: userPoints,
+                    userPhotoUrl: userPhotoUrl,
+                    isUserLeading: isUserLeading,
+                    partnerName: partnerName,
+                    partnerPoints: partnerPoints,
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 40),
 
-                // 2-Column Menu Grid
-                _buildMenuGrid(context),
-              ],
+                  // Partner Card
+                  _buildPartnerCard(
+                    context: context,
+                    partnerName: partnerName,
+                    partnerPhotoUrl: partnerPhotoUrl,
+                    partnerPoints: partnerPoints,
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Section Title
+                  const Text(
+                    'Jelajahi ✨',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF222222),
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 2-Column Menu Grid
+                  _buildMenuGrid(context),
+                ],
+              ),
             ),
           ),
         ),
@@ -358,6 +497,8 @@ class _HomeScreenState extends State<HomeScreen> {
     required int userPoints,
     required String? userPhotoUrl,
     required bool isUserLeading,
+    required String partnerName,
+    required int partnerPoints,
   }) {
     return Stack(
       fit: StackFit.expand,
@@ -396,298 +537,332 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // Scrollable Profile Content
+        // Scrollable Profile Content with Pull-to-Refresh
         SafeArea(
           bottom: false,
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 50, 20, 115),
-            child: Column(
-              children: [
-                // Avatar with Glowing Ring & Edit Pencil Button
-                Center(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      InkWell(
-                        onTap:
-                            _isUploadingPhoto ? null : _showImageSourcePicker,
-                        borderRadius: BorderRadius.circular(54),
-                        child: GradientAvatar(
-                          photoUrl: userPhotoUrl,
-                          size: 106,
-                          strokeWidth: 3.2,
-                          gap: 4.0,
-                          fallback: _defaultUserAvatar(),
-                          child: _isUploadingPhoto
-                              ? Container(
-                                  color: const Color(0xFF0B192C),
-                                  child: const Center(
-                                    child: SizedBox(
-                                      width: 28,
-                                      height: 28,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
+          child: RefreshIndicator(
+            color: const Color(0xFF0088FF),
+            backgroundColor: Colors.white,
+            onRefresh: _refreshAllData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 50, 20, 115),
+              child: Column(
+                children: [
+                  // Avatar with Glowing Ring & Edit Pencil Button
+                  Center(
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        InkWell(
+                          onTap:
+                              _isUploadingPhoto ? null : _showImageSourcePicker,
+                          borderRadius: BorderRadius.circular(54),
+                          child: GradientAvatar(
+                            photoUrl: userPhotoUrl,
+                            size: 106,
+                            strokeWidth: 3.2,
+                            gap: 4.0,
+                            fallback: _defaultUserAvatar(),
+                            child: _isUploadingPhoto
+                                ? Container(
+                                    color: const Color(0xFF0B192C),
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 28,
+                                        height: 28,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                            Colors.white,
+                                          ),
                                         ),
                                       ),
                                     ),
+                                  )
+                                : null,
+                          ),
+                        ),
+
+                        // Yellow Edit Pencil Badge
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: InkWell(
+                            onTap: _isUploadingPhoto
+                                ? null
+                                : _showImageSourcePicker,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.all(6.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFB800),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFFB800)
+                                        .withValues(alpha: 0.45),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
                                   ),
-                                )
-                              : null,
-                        ),
-                      ),
-
-                      // Yellow Edit Pencil Badge
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: InkWell(
-                          onTap:
-                              _isUploadingPhoto ? null : _showImageSourcePicker,
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.all(6.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFB800),
-                              shape: BoxShape.circle,
-                              border: Border.all(
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.edit_rounded,
                                 color: Colors.white,
-                                width: 2.2,
+                                size: 14,
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFFFB800)
-                                      .withValues(alpha: 0.45),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // User Name
+                  Text(
+                    userName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E293B),
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Badges Row (Points Pill + Rank Shield) with 3D Interactive Tooltip
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      BouncyPressable(
+                        onTap: () => _showPointBadgeTooltip(
+                          key: _profilePointKey,
+                          points: userPoints,
+                        ),
+                        child: Container(
+                          key: _profilePointKey,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF6B55F5),
+                                Color(0xFF4C8DF5),
                               ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                            child: const Icon(
-                              Icons.edit_rounded,
-                              color: Colors.white,
-                              size: 14,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.28),
+                              width: 1.1,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF6155F5)
+                                    .withValues(alpha: 0.38),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                'lib/assets/homescreen assets/7068473 3.png',
+                                width: 17,
+                                height: 17,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.stars_rounded,
+                                  color: Colors.yellowAccent,
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$userPoints Poin',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // User Name
-                Text(
-                  userName,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1E293B),
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // Badges Row (Points Pill + Rank Shield)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 11,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF6B55F5),
-                            Color(0xFF4C8DF5),
-                          ],
+                      const SizedBox(width: 8),
+                      BouncyPressable(
+                        onTap: () => _showShieldBadgeTooltip(
+                          key: _profileShieldKey,
+                          isLeading: isUserLeading,
+                          userPoints: userPoints,
+                          partnerPoints: partnerPoints,
+                          partnerName: partnerName,
                         ),
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                const Color(0xFF6155F5).withValues(alpha: 0.32),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                        child: Container(
+                          key: _profileShieldKey,
+                          width: 32,
+                          height: 32,
+                          padding: const EdgeInsets.all(4.5),
+                          decoration: BoxDecoration(
+                            gradient: AppColors.gradientOrange,
+                            borderRadius: BorderRadius.circular(9),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFF96E0D)
+                                    .withValues(alpha: 0.35),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Image.asset(
-                            'lib/assets/homescreen assets/7068473 3.png',
-                            width: 17,
-                            height: 17,
+                          child: Image.asset(
+                            isUserLeading
+                                ? 'lib/assets/homescreen assets/7068473 3 (1).png'
+                                : 'lib/assets/homescreen assets/7068473 3 (2).png',
+                            fit: BoxFit.contain,
                             errorBuilder: (_, __, ___) => const Icon(
-                              Icons.stars_rounded,
-                              color: Colors.yellowAccent,
-                              size: 16,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$userPoints Poin',
-                            style: const TextStyle(
+                              Icons.shield,
                               color: Colors.white,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
+                              size: 18,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      width: 32,
-                      height: 32,
-                      padding: const EdgeInsets.all(4.5),
-                      decoration: BoxDecoration(
-                        gradient: AppColors.gradientOrange,
-                        borderRadius: BorderRadius.circular(9),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                const Color(0xFFF96E0D).withValues(alpha: 0.35),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        isUserLeading
-                            ? 'lib/assets/homescreen assets/7068473 3 (1).png'
-                            : 'lib/assets/homescreen assets/7068473 3 (2).png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.shield,
-                          color: Colors.white,
-                          size: 18,
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 36),
-
-                // Button 1: Pengaturan Akun
-                Container(
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Color(0xFF0088FF),
-                        Color(0xFF0775D5),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF0088FF).withValues(alpha: 0.38),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => context.push('/edit-account'),
-                      borderRadius: BorderRadius.circular(16),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 18),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.settings_outlined,
-                              color: Colors.white,
-                              size: 22,
-                            ),
-                            SizedBox(width: 14),
-                            Expanded(
-                              child: Text(
-                                'Pengaturan Akun',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: Colors.white,
-                              size: 22,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 36),
 
-                // Button 2: Keluar Aplikasi
-                Container(
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Color(0xFFFF3B30),
-                        Color(0xFFE02424),
+                  // Button 1: Pengaturan Akun
+                  Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Color(0xFF0088FF),
+                          Color(0xFF0775D5),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              const Color(0xFF0088FF).withValues(alpha: 0.38),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFF3B30).withValues(alpha: 0.35),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _showLogoutDialog,
-                      borderRadius: BorderRadius.circular(16),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 18),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.logout_rounded,
-                              color: Colors.white,
-                              size: 22,
-                            ),
-                            SizedBox(width: 14),
-                            Expanded(
-                              child: Text(
-                                'Keluar Aplikasi',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _navigateTo('/edit-account'),
+                        borderRadius: BorderRadius.circular(16),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 18),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.settings_outlined,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                              SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  'Pengaturan Akun',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 14),
+
+                  // Button 2: Keluar Aplikasi
+                  Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Color(0xFFFF3B30),
+                          Color(0xFFE02424),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              const Color(0xFFFF3B30).withValues(alpha: 0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _showLogoutDialog,
+                        borderRadius: BorderRadius.circular(16),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 18),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.logout_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                              SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  'Keluar Aplikasi',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -704,6 +879,8 @@ class _HomeScreenState extends State<HomeScreen> {
     required int userPoints,
     required String? userPhotoUrl,
     required bool isUserLeading,
+    required String partnerName,
+    required int partnerPoints,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -735,74 +912,100 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6B55F5), Color(0xFF4C8DF5)],
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              const Color(0xFF6155F5).withValues(alpha: 0.32),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
+                  BouncyPressable(
+                    onTap: () => _showPointBadgeTooltip(
+                      key: _homePointKey,
+                      points: userPoints,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          'lib/assets/homescreen assets/7068473 3.png',
-                          width: 17,
-                          height: 17,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.stars_rounded,
-                            color: Colors.yellowAccent,
-                            size: 16,
-                          ),
+                    child: Container(
+                      key: _homePointKey,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF6B55F5), Color(0xFF4C8DF5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$userPoints Poin',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.28),
+                          width: 1.1,
                         ),
-                      ],
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFF6155F5).withValues(alpha: 0.38),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Image.asset(
+                            'lib/assets/homescreen assets/7068473 3.png',
+                            width: 17,
+                            height: 17,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.stars_rounded,
+                              color: Colors.yellowAccent,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '$userPoints Poin',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    width: 32,
-                    height: 32,
-                    padding: const EdgeInsets.all(4.5),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.gradientOrange,
-                      borderRadius: BorderRadius.circular(9),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              const Color(0xFFF96E0D).withValues(alpha: 0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
+                  BouncyPressable(
+                    onTap: () => _showShieldBadgeTooltip(
+                      key: _homeShieldKey,
+                      isLeading: isUserLeading,
+                      userPoints: userPoints,
+                      partnerPoints: partnerPoints,
+                      partnerName: partnerName,
                     ),
-                    child: Image.asset(
-                      isUserLeading
-                          ? 'lib/assets/homescreen assets/7068473 3 (1).png'
-                          : 'lib/assets/homescreen assets/7068473 3 (2).png',
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.shield,
-                        color: Colors.white,
-                        size: 18,
+                    child: Container(
+                      key: _homeShieldKey,
+                      width: 32,
+                      height: 32,
+                      padding: const EdgeInsets.all(4.5),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.gradientOrange,
+                        borderRadius: BorderRadius.circular(9),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFFF96E0D).withValues(alpha: 0.35),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Image.asset(
+                        isUserLeading
+                            ? 'lib/assets/homescreen assets/7068473 3 (1).png'
+                            : 'lib/assets/homescreen assets/7068473 3 (2).png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.shield,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                       ),
                     ),
                   ),
@@ -889,7 +1092,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   // Partner Avatar with Yellow Ring (Long press to preview with Bouncy Animation)
                   BouncyPressable(
-                    onTap: () => context.push('/partner-home'),
+                    onTap: () => _navigateTo('/partner-home'),
                     onLongPress: () {
                       showProfilePhotoPreview(
                         context,
@@ -941,29 +1144,52 @@ class _HomeScreenState extends State<HomeScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 3),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              'lib/assets/homescreen assets/7068473 3.png',
-                              width: 19,
-                              height: 19,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.stars_rounded,
-                                color: Color(0xFFFFCC00),
-                                size: 15,
+                        BouncyPressable(
+                          onTap: () => _showPointBadgeTooltip(
+                            key: _partnerPointKey,
+                            points: partnerPoints,
+                            isPartner: true,
+                            partnerName: partnerName,
+                          ),
+                          child: Container(
+                            key: _partnerPointKey,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.28),
+                                width: 0.9,
                               ),
                             ),
-                            const SizedBox(width: 5),
-                            Text(
-                              '$partnerPoints Poin',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.95),
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Image.asset(
+                                  'lib/assets/homescreen assets/7068473 3.png',
+                                  width: 17,
+                                  height: 17,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.stars_rounded,
+                                    color: Color(0xFFFFCC00),
+                                    size: 15,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  '$partnerPoints Poin',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.95),
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
@@ -972,7 +1198,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Button "Kunjungi →"
                   InkWell(
-                    onTap: () => context.push('/partner-home'),
+                    onTap: () => _navigateTo('/partner-home'),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -1050,7 +1276,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 imageTop: null,
                 imageBottom: -34,
                 imageWidth: 135,
-                onTap: () => context.push('/books'),
+                onTap: () => _navigateTo('/books'),
               ),
             ),
             const SizedBox(width: 14),
@@ -1063,7 +1289,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 imageTop: 10,
                 imageBottom: null,
                 imageWidth: 90,
-                onTap: () => context.push('/notes'),
+                onTap: () => _navigateTo('/notes'),
               ),
             ),
           ],
@@ -1079,10 +1305,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 imageTop: 8,
                 imageBottom: null,
                 imageWidth: 100,
-                onTap: () => AppSnackBar.info(
-                  context,
-                  'Modul Keuangan segera hadir! 💰',
-                ),
+                onTap: () => _navigateTo('/finance'),
               ),
             ),
             const SizedBox(width: 14),
@@ -1094,7 +1317,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 imageTop: null,
                 imageBottom: -35,
                 imageWidth: 130,
-                onTap: () => context.push('/recipes'),
+                onTap: () => _navigateTo('/recipes'),
               ),
             ),
           ],
@@ -1111,7 +1334,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 imageTop: -5,
                 imageBottom: null,
                 imageWidth: 120,
-                onTap: () => context.push('/reminders'),
+                onTap: () => _navigateTo('/reminders'),
               ),
             ),
             const SizedBox(width: 14),
@@ -1124,7 +1347,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 imageTop: null,
                 imageBottom: -15,
                 imageWidth: 110,
-                onTap: () => context.push('/vacations'),
+                onTap: () => _navigateTo('/vacations'),
               ),
             ),
           ],
@@ -1141,7 +1364,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 imageTop: null,
                 imageBottom: -15,
                 imageWidth: 110,
-                onTap: () => context.push('/history'),
+                onTap: () => _navigateTo('/history'),
               ),
             ),
             const SizedBox(width: 14),
@@ -1268,6 +1491,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       onTap: (int index) {
         setState(() => _currentNavIndex = index);
+        _refreshAllData();
       },
     );
   }

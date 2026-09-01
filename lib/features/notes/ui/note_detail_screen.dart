@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/app_snackbar.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/note_model.dart';
 import '../providers/note_provider.dart';
@@ -493,18 +493,15 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                   letterSpacing: -0.4,
                 ),
               ),
-              const SizedBox(height: 18),
 
-              // 4. Content: Checklist Items OR Text Body
+              // 4. Meta Info: Last update & updater (if shared)
+              _buildMetaInfo(authProvider),
+
+              // 5. Content: Checklist Items OR Text Body
               if (_currentNote.isChecklist)
                 _buildChecklistSection()
               else
                 _buildTextSection(),
-
-              const SizedBox(height: 24),
-
-              // 5. Quick Action Bar (Salin & Impor Teks)
-              _buildQuickActionBar(canEdit),
 
               const SizedBox(height: 40),
             ],
@@ -514,82 +511,56 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     );
   }
 
-  Widget _buildQuickActionBar(bool canEdit) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFE2E8F0),
-          width: 1.1,
-        ),
-      ),
+  Widget _buildMetaInfo(AuthProvider authProvider) {
+    final currentUserId = authProvider.currentUserProfile?.id;
+    final currentUserName = authProvider.currentUserProfile?.name.trim();
+    final effectiveCurrentUserName =
+        (currentUserName != null && currentUserName.isNotEmpty)
+            ? currentUserName
+            : 'Saya';
+    final partnerName = authProvider.partnerProfile?.name.trim();
+    final effectivePartnerName =
+        (partnerName != null && partnerName.isNotEmpty)
+            ? partnerName
+            : 'Pasangan';
+
+    final updateTime = _currentNote.updatedAt ?? _currentNote.createdAt;
+    final formattedTime = DateFormatter.formatActivityDate(updateTime);
+
+    String? updaterName;
+    if (_currentNote.isShared) {
+      final updaterId = _currentNote.lastUpdatedBy ?? _currentNote.addedBy;
+      if (updaterId != null && updaterId.isNotEmpty) {
+        if (updaterId == currentUserId) {
+          updaterName = effectiveCurrentUserName;
+        } else {
+          updaterName = effectivePartnerName;
+        }
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 18),
       child: Row(
         children: [
+          const Icon(
+            Icons.access_time_rounded,
+            size: 13,
+            color: Color(0xFF94A3B8),
+          ),
+          const SizedBox(width: 5),
           Expanded(
-            child: InkWell(
-              onTap: _handleExportNote,
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(
-                      Icons.copy_rounded,
-                      size: 16,
-                      color: Color(0xFF475569),
-                    ),
-                    SizedBox(width: 7),
-                    Text(
-                      'Salin Catatan',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF334155),
-                      ),
-                    ),
-                  ],
-                ),
+            child: Text(
+              updaterName != null
+                  ? 'Terakhir diperbarui: $formattedTime • oleh $updaterName'
+                  : 'Terakhir diperbarui: $formattedTime',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF94A3B8),
               ),
             ),
           ),
-          if (canEdit) ...[
-            Container(
-              width: 1,
-              height: 22,
-              color: const Color(0xFFCBD5E1),
-            ),
-            Expanded(
-              child: InkWell(
-                onTap: _handleImportNote,
-                borderRadius: BorderRadius.circular(10),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(
-                        Icons.file_download_outlined,
-                        size: 18,
-                        color: AppColors.primaryPurple,
-                      ),
-                      SizedBox(width: 7),
-                      Text(
-                        'Impor Teks',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primaryPurple,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );

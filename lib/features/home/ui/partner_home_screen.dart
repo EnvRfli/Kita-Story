@@ -3,12 +3,109 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/utils/app_snackbar.dart';
+import '../../../../core/widgets/badge_bubble_tooltip.dart';
 import '../../../../core/widgets/gradient_avatar.dart';
 import '../../auth/providers/auth_provider.dart';
 
-class PartnerHomeScreen extends StatelessWidget {
+class PartnerHomeScreen extends StatefulWidget {
   const PartnerHomeScreen({super.key});
+
+  @override
+  State<PartnerHomeScreen> createState() => _PartnerHomeScreenState();
+}
+
+class _PartnerHomeScreenState extends State<PartnerHomeScreen> {
+  final GlobalKey _pointKey = GlobalKey();
+  final GlobalKey _shieldKey = GlobalKey();
+
+  void _showPointTooltip(
+    BuildContext context,
+    int partnerPoints,
+    String partnerName,
+  ) {
+    showBadgeBubbleTooltip(
+      context: context,
+      targetKey: _pointKey,
+      title: 'Poin Aktivitas ✨',
+      badgeLabel: 'Total: $partnerPoints Poin',
+      gradientColors: const [Color(0xFF6B55F5), Color(0xFF4C8DF5)],
+      icon: Image.asset(
+        'lib/assets/homescreen assets/7068473 3.png',
+        width: 20,
+        height: 20,
+        errorBuilder: (_, __, ___) => const Icon(
+          Icons.stars_rounded,
+          color: Colors.amberAccent,
+          size: 20,
+        ),
+      ),
+      description:
+          'Ini adalah total poin yang telah dikumpulkan oleh $partnerName dari berbagai aktivitas seperti membaca buku, menyelesaikan checklist catatan, resep, dan liburan.',
+      footerTip: 'Beri semangat $partnerName untuk terus mengumpulkan poin!',
+    );
+  }
+
+  void _showShieldTooltip({
+    required BuildContext context,
+    required bool isPartnerLeading,
+    required int partnerPoints,
+    required int userPoints,
+    required String partnerName,
+    required String userName,
+  }) {
+    final diffPoints = (partnerPoints - userPoints).abs();
+    final pointComparison = partnerPoints >= userPoints
+        ? (partnerPoints == userPoints
+            ? 'Poin seimbang dengan $userName ($partnerPoints Poin)!'
+            : 'Memimpin +$diffPoints poin di atas $userName!')
+        : 'Tertinggal -$diffPoints poin di bawah $userName.';
+
+    if (isPartnerLeading) {
+      showBadgeBubbleTooltip(
+        context: context,
+        targetKey: _shieldKey,
+        title: 'Shield 🏆',
+        badgeLabel: 'Rank: Pemimpin Poin',
+        gradientColors: const [Color(0xFFFF8A00), Color(0xFFFF5E00)],
+        icon: Image.asset(
+          'lib/assets/homescreen assets/7068473 3 (1).png',
+          width: 22,
+          height: 22,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.shield_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+        description:
+            'Hebat sekali! $partnerName saat ini menyandang Shield karena memiliki perolehan poin tertinggi ($partnerPoints Poin).',
+        footerTip: pointComparison,
+      );
+    } else {
+      showBadgeBubbleTooltip(
+        context: context,
+        targetKey: _shieldKey,
+        title: 'Shield 🛡️',
+        badgeLabel: 'Rank: Penantang Setia',
+        gradientColors: const [Color(0xFFFF8A00), Color(0xFFFF5E00)],
+        icon: Image.asset(
+          'lib/assets/homescreen assets/7068473 3 (2).png',
+          width: 22,
+          height: 22,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.shield_outlined,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+        description:
+            'Saat ini $userName sedang memegang Shield Emas ($userPoints Poin). $partnerName sedang mengejar poin untuk merebut kembali Shield Emas!',
+        footerTip: pointComparison,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +117,8 @@ class PartnerHomeScreen extends StatelessWidget {
     final partnerName = partnerUser?.name.isNotEmpty == true
         ? partnerUser!.name
         : 'Nazilla Andiz A';
+    final userName =
+        currentUser?.name.isNotEmpty == true ? currentUser!.name : 'Kamu';
     final userPoints = currentUser?.points ?? 100;
     final partnerPoints = partnerUser?.points ?? 0;
     final isPartnerLeading = partnerPoints >= userPoints;
@@ -175,81 +274,110 @@ class PartnerHomeScreen extends StatelessWidget {
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                // Points Pill
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 11, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFF6B55F5),
-                                        Color(0xFF4C8DF5),
+                                // Points Pill with 3D Tooltip
+                                BouncyPressable(
+                                  onTap: () => _showPointTooltip(
+                                    context,
+                                    partnerPoints,
+                                    partnerName,
+                                  ),
+                                  child: Container(
+                                    key: _pointKey,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 11,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF6B55F5),
+                                          Color(0xFF4C8DF5),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.28),
+                                        width: 1.1,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF6155F5)
+                                              .withValues(alpha: 0.38),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
                                       ],
                                     ),
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFF6155F5)
-                                            .withValues(alpha: 0.32),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Image.asset(
-                                        'lib/assets/homescreen assets/7068473 3.png',
-                                        width: 17,
-                                        height: 17,
-                                        errorBuilder: (_, __, ___) =>
-                                            const Icon(
-                                          Icons.stars_rounded,
-                                          color: Colors.yellowAccent,
-                                          size: 16,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Image.asset(
+                                          'lib/assets/homescreen assets/7068473 3.png',
+                                          width: 17,
+                                          height: 17,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(
+                                            Icons.stars_rounded,
+                                            color: Colors.yellowAccent,
+                                            size: 16,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '$partnerPoints Poin',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w700,
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '$partnerPoints Poin',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: -0.1,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
 
-                                // Leader/Rank Shield Badge with AppColors.gradientOrange
-                                Container(
-                                  width: 32,
-                                  height: 32,
-                                  padding: const EdgeInsets.all(4.5),
-                                  decoration: BoxDecoration(
-                                    gradient: AppColors.gradientOrange,
-                                    borderRadius: BorderRadius.circular(9),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFFF96E0D)
-                                            .withValues(alpha: 0.35),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ],
+                                // Leader/Rank Shield Badge with 3D Tooltip
+                                BouncyPressable(
+                                  onTap: () => _showShieldTooltip(
+                                    context: context,
+                                    isPartnerLeading: isPartnerLeading,
+                                    partnerPoints: partnerPoints,
+                                    userPoints: userPoints,
+                                    partnerName: partnerName,
+                                    userName: userName,
                                   ),
-                                  child: Image.asset(
-                                    isPartnerLeading
-                                        ? 'lib/assets/homescreen assets/7068473 3 (1).png'
-                                        : 'lib/assets/homescreen assets/7068473 3 (2).png',
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.shield,
-                                      color: Colors.white,
-                                      size: 18,
+                                  child: Container(
+                                    key: _shieldKey,
+                                    width: 32,
+                                    height: 32,
+                                    padding: const EdgeInsets.all(4.5),
+                                    decoration: BoxDecoration(
+                                      gradient: AppColors.gradientOrange,
+                                      borderRadius: BorderRadius.circular(9),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFFF96E0D)
+                                              .withValues(alpha: 0.35),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Image.asset(
+                                      isPartnerLeading
+                                          ? 'lib/assets/homescreen assets/7068473 3 (1).png'
+                                          : 'lib/assets/homescreen assets/7068473 3 (2).png',
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                        Icons.shield,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -378,10 +506,16 @@ class PartnerHomeScreen extends StatelessWidget {
                 imageTop: 8,
                 imageBottom: null,
                 imageWidth: 100,
-                onTap: () => AppSnackBar.info(
-                  context,
-                  'Modul Keuangan Pasangan segera hadir! 💰',
-                ),
+                onTap: () {
+                  final partner = context.read<AuthProvider>().partnerProfile;
+                  context.push(
+                    '/finance',
+                    extra: {
+                      'targetUserId': partner?.id,
+                      'isPartnerMode': true,
+                    },
+                  );
+                },
               ),
             ),
             const SizedBox(width: 14),

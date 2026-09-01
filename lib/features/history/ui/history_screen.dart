@@ -84,67 +84,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
 
-            // 2. Search Bar
+            // 2. Permanent Search Bar
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFE2E8F0),
-                    width: 1.1,
-                  ),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (_) => setState(() {}),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF1E293B),
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Cari riwayat...',
-                    hintStyle: const TextStyle(
-                      fontSize: 13.5,
-                      color: Color(0xFF94A3B8),
-                    ),
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      color: Color(0xFF94A3B8),
-                      size: 20,
-                    ),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(
-                              Icons.close_rounded,
-                              color: Color(0xFF94A3B8),
-                              size: 16,
-                            ),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {});
-                            },
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 13,
-                    ),
-                  ),
-                ),
-              ),
+              child: _buildSearchField(),
             ),
 
-            const SizedBox(height: 6),
-
-            // 2. Activity Logs List
+            // 3. Activity Logs List / Empty State / No Search Results
             Expanded(
               child: Consumer<HistoryProvider>(
                 builder: (context, provider, child) {
-                  if (provider.isLoading) {
+                  if (provider.isLoading && provider.logs.isEmpty) {
                     return const Center(
                       child: CircularProgressIndicator(
                         color: Color(0xFFFF8A00),
@@ -152,7 +102,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     );
                   }
 
-                  if (provider.errorMessage != null) {
+                  if (provider.errorMessage != null && provider.logs.isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -185,88 +135,179 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     );
                   }
 
-                  final logs = _filterLogs(provider.logs);
-
-                  if (logs.isEmpty) {
-                    return RefreshIndicator(
-                      onRefresh: () => provider.fetchLogs(isRefresh: true),
-                      color: const Color(0xFFFF8A00),
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 80),
-                        children: [
-                          Center(
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 72,
-                                  height: 72,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFF7ED),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: const Color(0xFFFFEDD5),
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.history_rounded,
-                                      size: 36,
-                                      color: Color(0xFFFF8A00),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  _searchController.text.trim().isNotEmpty
-                                      ? 'Tidak ada riwayat yang cocok'
-                                      : 'Belum Ada Riwayat Aktivitas',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF1E293B),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _searchController.text.trim().isNotEmpty
-                                      ? 'Coba gunakan kata kunci pencarian yang lain.'
-                                      : 'Aktivitas membaca, resep, catatan, dan pengingat akan tercatat di sini.',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF94A3B8),
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
+                  final allLogs = provider.logs;
+                  final filteredLogs = _filterLogs(allLogs);
 
                   return RefreshIndicator(
                     onRefresh: () => provider.fetchLogs(isRefresh: true),
                     color: const Color(0xFFFF8A00),
-                    child: ListView.separated(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      itemCount: logs.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 14),
-                      itemBuilder: (context, index) {
-                        final log = logs[index];
-                        return HistoryCard(log: log);
-                      },
-                    ),
+                    child: allLogs.isEmpty
+                        ? _buildEmptyState()
+                        : filteredLogs.isEmpty
+                            ? _buildNoSearchResultsState()
+                            : ListView.separated(
+                                physics: const AlwaysScrollableScrollPhysics(
+                                  parent: BouncingScrollPhysics(),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 8,
+                                ),
+                                itemCount: filteredLogs.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 14),
+                                itemBuilder: (context, index) {
+                                  final log = filteredLogs[index];
+                                  return HistoryCard(log: log);
+                                },
+                              ),
                   );
                 },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.1,
+        ),
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (_) => setState(() {}),
+        style: const TextStyle(
+          fontSize: 14,
+          color: Color(0xFF1E293B),
+        ),
+        decoration: InputDecoration(
+          hintText: 'Cari riwayat aktivitas...',
+          hintStyle: const TextStyle(
+            fontSize: 13.5,
+            color: Color(0xFF94A3B8),
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF94A3B8),
+            size: 20,
+          ),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF94A3B8),
+                    size: 16,
+                  ),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {});
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFFFFEDD5),
+                  width: 1.5,
+                ),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.history_rounded,
+                  size: 36,
+                  color: Color(0xFFFF8A00),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Belum Ada Riwayat Aktivitas',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Aktivitas membaca, resep, catatan, dan pengingat akan tercatat di sini.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF94A3B8),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoSearchResultsState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.search_off_rounded,
+                size: 38,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Riwayat Tidak Ditemukan',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Tidak ada riwayat yang cocok dengan "${_searchController.text.trim()}".',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF94A3B8),
               ),
             ),
           ],

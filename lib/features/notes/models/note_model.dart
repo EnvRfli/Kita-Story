@@ -50,15 +50,15 @@ class NoteModel {
       color: json['color'] as String? ?? 'pink',
       isCompleted: json['is_completed'] as bool? ?? false,
       completedAt: json['completed_at'] != null
-          ? DateTime.tryParse(json['completed_at'] as String)
+          ? DateTime.tryParse(json['completed_at'] as String)?.toLocal()
           : null,
       addedBy: json['added_by'] as String?,
       lastUpdatedBy: json['last_updated_by'] as String?,
       createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'] as String)
+          ? DateTime.tryParse(json['created_at'] as String)?.toLocal()
           : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.tryParse(json['updated_at'] as String)
+          ? DateTime.tryParse(json['updated_at'] as String)?.toLocal()
           : null,
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       isShared: json['is_shared'] as bool? ?? false,

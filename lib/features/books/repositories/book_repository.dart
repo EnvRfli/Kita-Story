@@ -50,6 +50,14 @@ class BookRepository {
       bookData['last_updated_by'] = user.id;
     }
 
+    // Sanitize personal_rating so 0 or invalid rating is omitted
+    if (bookData.containsKey('personal_rating')) {
+      final rating = bookData['personal_rating'];
+      if (rating == null || (rating is num && (rating < 1 || rating > 5))) {
+        bookData.remove('personal_rating');
+      }
+    }
+
     final data = await _client.from('books').insert(bookData).select().single();
     final bookTitle = bookData['title'] as String? ?? 'Buku';
 
@@ -72,6 +80,14 @@ class BookRepository {
     final user = _client.auth.currentUser;
     if (user != null) {
       updates['last_updated_by'] = user.id;
+    }
+
+    // Sanitize personal_rating so 0 or invalid rating is set to null
+    if (updates.containsKey('personal_rating')) {
+      final rating = updates['personal_rating'];
+      if (rating is num && (rating < 1 || rating > 5)) {
+        updates['personal_rating'] = null;
+      }
     }
 
     await _client.from('books').update(updates).eq('id', id);

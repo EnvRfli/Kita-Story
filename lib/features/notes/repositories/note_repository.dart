@@ -60,8 +60,12 @@ class NoteRepository {
     }).toList();
 
     // Deterministic Multi-Device Ordering:
-    // Sort strictly by `sort_order` ASC, then `updated_at` / `created_at` DESC
+    // Active notes first, completed notes at the bottom.
+    // Within same completion status: sort strictly by `sort_order` ASC, then `updated_at` / `created_at` DESC
     notes.sort((a, b) {
+      if (a.isCompleted != b.isCompleted) {
+        return a.isCompleted ? 1 : -1;
+      }
       if (a.sortOrder != b.sortOrder) {
         return a.sortOrder.compareTo(b.sortOrder);
       }
@@ -234,7 +238,7 @@ class NoteRepository {
       'content': content?.trim(),
       'color': color ?? 'pink',
       'last_updated_by': userId,
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
 
     if (isShared != null) {
@@ -273,12 +277,13 @@ class NoteRepository {
     await _client.from('note_checklist_items').update({
       'is_checked': isChecked,
       'checked_by': isChecked ? userId : null,
-      'checked_at': isChecked ? DateTime.now().toIso8601String() : null,
+      'checked_at': isChecked ? DateTime.now().toUtc().toIso8601String() : null,
     }).eq('id', itemId);
 
-    if (isChecked && userId != null) {
+    if (userId != null) {
       String itemText = '';
       String noteTitle = '';
+      String? parentNoteId;
       try {
         final itemRecord = await _client
             .from('note_checklist_items')
@@ -286,6 +291,7 @@ class NoteRepository {
             .eq('id', itemId)
             .maybeSingle();
         if (itemRecord != null) {
+          parentNoteId = itemRecord['note_id'] as String?;
           itemText = itemRecord['item_text'] as String? ?? '';
           if (itemRecord['notes'] is Map) {
             noteTitle = itemRecord['notes']['title'] as String? ?? '';
@@ -293,23 +299,35 @@ class NoteRepository {
         }
       } catch (_) {}
 
-      String desc = 'Mencentang item checklist';
-      if (itemText.isNotEmpty && noteTitle.isNotEmpty) {
-        desc = 'Mencentang "$itemText" pada catatan "$noteTitle"';
-      } else if (itemText.isNotEmpty) {
-        desc = 'Mencentang "$itemText"';
-      } else if (noteTitle.isNotEmpty) {
-        desc = 'Mencentang checklist pada catatan "$noteTitle"';
+      // Update parent note's last_updated_by and updated_at
+      if (parentNoteId != null) {
+        try {
+          await _client.from('notes').update({
+            'last_updated_by': userId,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          }).eq('id', parentNoteId);
+        } catch (_) {}
       }
 
-      await ActivityLogService.recordActivityAndAddPoints(
-        userId: userId,
-        points: 1,
-        activityType: 'check_note_item',
-        title: 'Checklist Selesai ☑️',
-        description: desc,
-        referenceId: itemId,
-      );
+      if (isChecked) {
+        String desc = 'Mencentang item checklist';
+        if (itemText.isNotEmpty && noteTitle.isNotEmpty) {
+          desc = 'Mencentang "$itemText" pada catatan "$noteTitle"';
+        } else if (itemText.isNotEmpty) {
+          desc = 'Mencentang "$itemText"';
+        } else if (noteTitle.isNotEmpty) {
+          desc = 'Mencentang checklist pada catatan "$noteTitle"';
+        }
+
+        await ActivityLogService.recordActivityAndAddPoints(
+          userId: userId,
+          points: 1,
+          activityType: 'check_note_item',
+          title: 'Checklist Selesai ☑️',
+          description: desc,
+          referenceId: itemId,
+        );
+      }
     }
   }
 
@@ -318,9 +336,9 @@ class NoteRepository {
     final userId = currentUserId;
     await _client.from('notes').update({
       'is_completed': isCompleted,
-      'completed_at': isCompleted ? DateTime.now().toIso8601String() : null,
+      'completed_at': isCompleted ? DateTime.now().toUtc().toIso8601String() : null,
       'last_updated_by': userId,
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', noteId);
 
     // If marked completed, award +10 points to the user and log

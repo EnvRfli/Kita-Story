@@ -629,6 +629,7 @@ class RecipeDetailScreen extends StatelessWidget {
           title,
           style: const TextStyle(
             fontSize: 15.5,
+            fontWeight: FontWeight.bold,
             color: Color(0xFF1E293B),
             letterSpacing: -0.2,
           ),

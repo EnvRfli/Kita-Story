@@ -89,6 +89,7 @@ class NoteProvider extends ChangeNotifier {
         checklistItems: checklistItems,
       );
       _notes.insert(0, newNote);
+      _sortNotes();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -98,6 +99,20 @@ class NoteProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  void _sortNotes() {
+    _notes.sort((a, b) {
+      if (a.isCompleted != b.isCompleted) {
+        return a.isCompleted ? 1 : -1;
+      }
+      if (a.sortOrder != b.sortOrder) {
+        return a.sortOrder.compareTo(b.sortOrder);
+      }
+      final aTime = a.updatedAt ?? a.createdAt ?? DateTime(2000);
+      final bTime = b.updatedAt ?? b.createdAt ?? DateTime(2000);
+      return bTime.compareTo(aTime);
+    });
   }
 
   Future<bool> updateNote(
@@ -145,7 +160,12 @@ class NoteProvider extends ChangeNotifier {
         return item;
       }).toList();
 
-      _notes[noteIndex] = note.copyWith(items: updatedItems);
+      final currentUserId = _repository.currentUserId;
+      _notes[noteIndex] = note.copyWith(
+        items: updatedItems,
+        lastUpdatedBy: currentUserId,
+        updatedAt: DateTime.now(),
+      );
       notifyListeners();
     }
 
@@ -167,6 +187,7 @@ class NoteProvider extends ChangeNotifier {
           isCompleted: isCompleted,
           completedAt: isCompleted ? DateTime.now() : null,
         );
+        _sortNotes();
         notifyListeners();
       }
       return true;

@@ -12,6 +12,7 @@ import 'features/reminders/providers/reminder_provider.dart';
 import 'features/recipes/providers/recipe_provider.dart';
 import 'features/history/providers/history_provider.dart';
 import 'features/vacations/providers/vacation_provider.dart';
+import 'features/finances/providers/finance_provider.dart';
 
 import 'core/router/app_router.dart';
 
@@ -44,6 +45,7 @@ class KitaStoryApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => RecipeProvider()),
         ChangeNotifierProvider(create: (_) => HistoryProvider()),
         ChangeNotifierProvider(create: (_) => VacationProvider()),
+        ChangeNotifierProvider(create: (_) => FinanceProvider()),
       ],
       child: MaterialApp.router(
         title: 'DayTale',

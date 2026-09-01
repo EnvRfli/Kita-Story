@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../../core/utils/date_formatter.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/note_model.dart';
 
 class NoteCard extends StatelessWidget {
@@ -119,6 +122,9 @@ class NoteCard extends StatelessWidget {
                     _buildChecklistPreview(textColor, checkedColor)
                   else
                     _buildTextPreview(textColor),
+
+                  // Footer: Last Update & Updated By (if shared)
+                  _buildFooter(context, textColor),
                 ],
               ),
             ),
@@ -234,6 +240,69 @@ class NoteCard extends StatelessWidget {
       ),
       maxLines: 3,
       overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  Widget _buildFooter(BuildContext context, Color textColor) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUserProfile?.id;
+    final currentUserName = authProvider.currentUserProfile?.name.trim();
+    final effectiveCurrentUserName =
+        (currentUserName != null && currentUserName.isNotEmpty)
+            ? currentUserName
+            : 'Saya';
+    final partnerName = authProvider.partnerProfile?.name.trim();
+    final effectivePartnerName = (partnerName != null && partnerName.isNotEmpty)
+        ? partnerName
+        : 'Pasangan';
+
+    final updateTime = note.updatedAt ?? note.createdAt;
+    final timeStr = DateFormatter.formatRelativeTime(updateTime);
+
+    String updater = '';
+    if (note.isShared) {
+      final updaterId = note.lastUpdatedBy ?? note.addedBy;
+      if (updaterId != null && updaterId.isNotEmpty) {
+        if (updaterId == currentUserId) {
+          updater = effectiveCurrentUserName;
+        } else {
+          updater = effectivePartnerName;
+        }
+      }
+    }
+
+    String label = '';
+    if (timeStr.isNotEmpty && updater.isNotEmpty) {
+      label = '$timeStr • oleh $updater';
+    } else if (timeStr.isNotEmpty) {
+      label = timeStr;
+    } else if (updater.isNotEmpty) {
+      label = 'oleh $updater';
+    }
+
+    if (label.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Icon(
+            Icons.access_time_rounded,
+            size: 11.5,
+            color: textColor.withValues(alpha: 0.65),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: textColor.withValues(alpha: 0.70),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

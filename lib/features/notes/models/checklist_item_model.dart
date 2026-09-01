@@ -28,10 +28,10 @@ class ChecklistItemModel {
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       checkedBy: json['checked_by'] as String?,
       checkedAt: json['checked_at'] != null
-          ? DateTime.tryParse(json['checked_at'] as String)
+          ? DateTime.tryParse(json['checked_at'] as String)?.toLocal()
           : null,
       createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'] as String)
+          ? DateTime.tryParse(json['created_at'] as String)?.toLocal()
           : null,
     );
   }

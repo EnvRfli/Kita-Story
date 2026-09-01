@@ -52,14 +52,32 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   List<NoteModel> _filterNotes(List<NoteModel> notes) {
     final query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) return notes;
+    final list = query.isEmpty
+        ? notes
+        : notes.where((note) {
+            final title = note.title.toLowerCase();
+            final content = (note.content ?? '').toLowerCase();
+            final itemsText =
+                note.items.map((i) => i.itemText.toLowerCase()).join(' ');
+            return title.contains(query) ||
+                content.contains(query) ||
+                itemsText.contains(query);
+          }).toList();
 
-    return notes.where((note) {
-      final title = note.title.toLowerCase();
-      final content = (note.content ?? '').toLowerCase();
-      final itemsText = note.items.map((i) => i.itemText.toLowerCase()).join(' ');
-      return title.contains(query) || content.contains(query) || itemsText.contains(query);
-    }).toList();
+    if (_hasOrderChanged) return list;
+
+    return List<NoteModel>.from(list)
+      ..sort((a, b) {
+        if (a.isCompleted != b.isCompleted) {
+          return a.isCompleted ? 1 : -1;
+        }
+        if (a.sortOrder != b.sortOrder) {
+          return a.sortOrder.compareTo(b.sortOrder);
+        }
+        final aTime = a.updatedAt ?? a.createdAt ?? DateTime(2000);
+        final bTime = b.updatedAt ?? b.createdAt ?? DateTime(2000);
+        return bTime.compareTo(aTime);
+      });
   }
 
   Future<void> _openAddNote() async {

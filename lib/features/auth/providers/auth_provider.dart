@@ -125,7 +125,11 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  RealtimeChannel? _profileSubscription;
+
   Future<void> signOut() async {
+    _profileSubscription?.unsubscribe();
+    _profileSubscription = null;
     await _repository.signOut();
     _currentUserProfile = null;
     _partnerProfile = null;
@@ -140,10 +144,47 @@ class AuthProvider extends ChangeNotifier {
     } else {
       _partnerProfile = null;
     }
+
+    _subscribeToProfiles(userId, _currentUserProfile?.partnerId);
+  }
+
+  void _subscribeToProfiles(String userId, String? partnerId) {
+    _profileSubscription?.unsubscribe();
+
+    try {
+      final client = Supabase.instance.client;
+      final channel = client.channel('public:app_users_sync:$userId');
+
+      channel.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'app_users',
+        callback: (payload) {
+          final newRec = payload.newRecord;
+          if (newRec.isEmpty) return;
+          final recordId = newRec['id'] as String?;
+          if (recordId == userId) {
+            _currentUserProfile = UserModel.fromJson(newRec);
+            notifyListeners();
+          } else if (partnerId != null && recordId == partnerId) {
+            _partnerProfile = UserModel.fromJson(newRec);
+            notifyListeners();
+          }
+        },
+      ).subscribe();
+
+      _profileSubscription = channel;
+    } catch (_) {}
   }
 
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _profileSubscription?.unsubscribe();
+    super.dispose();
   }
 }

@@ -3,6 +3,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse notificationResponse) {
+  debugPrint(
+      'Background notification tapped: id=${notificationResponse.id}, payload=${notificationResponse.payload}');
+}
+
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -45,24 +51,32 @@ class NotificationService {
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           debugPrint('Notification clicked with payload: ${response.payload}');
         },
+        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
 
-      // Request permissions for Android 13+
-      await _requestPermissions();
+      // Create Android Notification Channel explicitly with MAX importance
+      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+          _notificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+
+      if (androidImplementation != null) {
+        const AndroidNotificationChannel channel = AndroidNotificationChannel(
+          channelId,
+          channelName,
+          description: channelDescription,
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+          showBadge: true,
+          enableLights: true,
+        );
+
+        await androidImplementation.createNotificationChannel(channel);
+        await androidImplementation.requestNotificationsPermission();
+        await androidImplementation.requestExactAlarmsPermission();
+      }
     } catch (e) {
-      debugPrint(
-          'Notification initialization warning: $e (Aplikasi butuh full restart agar plugin native ter-compile)');
-    }
-  }
-
-  static Future<void> _requestPermissions() async {
-    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-        _notificationsPlugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-
-    if (androidImplementation != null) {
-      await androidImplementation.requestNotificationsPermission();
-      await androidImplementation.requestExactAlarmsPermission();
+      debugPrint('Notification initialization warning: $e');
     }
   }
 
@@ -74,9 +88,88 @@ class NotificationService {
     required DateTime scheduledDate,
     String? payload,
   }) async {
-    // Avoid scheduling in the past
-    if (scheduledDate.isBefore(DateTime.now())) return;
+    final now = DateTime.now();
+    if (scheduledDate.isBefore(now)) return;
 
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      channelId,
+      channelName,
+      channelDescription: channelDescription,
+      importance: Importance.max,
+      priority: Priority.max,
+      icon: '@mipmap/ic_launcher',
+      enableVibration: true,
+      playSound: true,
+      category: AndroidNotificationCategory.alarm,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
+      fullScreenIntent: true,
+      visibility: NotificationVisibility.public,
+      enableLights: true,
+      autoCancel: true,
+      showWhen: true,
+    );
+
+    const NotificationDetails notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
+
+    try {
+      final tzDateTime = tz.TZDateTime(
+        tz.local,
+        scheduledDate.year,
+        scheduledDate.month,
+        scheduledDate.day,
+        scheduledDate.hour,
+        scheduledDate.minute,
+        scheduledDate.second,
+      );
+
+      if (tzDateTime.isBefore(tz.TZDateTime.now(tz.local))) return;
+
+      try {
+        // Prioritize alarmClock so OS wakes device up when app is terminated/closed
+        await _notificationsPlugin.zonedSchedule(
+          id: id,
+          title: title,
+          body: body,
+          scheduledDate: tzDateTime,
+          notificationDetails: notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.alarmClock,
+          payload: payload,
+        );
+      } catch (e) {
+        debugPrint(
+            'alarmClock failed, falling back to exactAllowWhileIdle: $e');
+        await _notificationsPlugin.zonedSchedule(
+          id: id,
+          title: title,
+          body: body,
+          scheduledDate: tzDateTime,
+          notificationDetails: notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          payload: payload,
+        );
+      }
+
+      debugPrint('Notification scheduled: id=$id, at=$tzDateTime ($title)');
+    } catch (e) {
+      debugPrint('Failed to schedule notification: $e');
+    }
+  }
+
+  /// Immediately show a test notification
+  static Future<void> showInstantNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
       channelId,
@@ -98,22 +191,13 @@ class NotificationService {
       ),
     );
 
-    try {
-      final tzDateTime = tz.TZDateTime.from(scheduledDate, tz.local);
-
-      await _notificationsPlugin.zonedSchedule(
-        id: id,
-        title: title,
-        body: body,
-        scheduledDate: tzDateTime,
-        notificationDetails: notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        payload: payload,
-      );
-      debugPrint('Notification scheduled: id=$id, at=$scheduledDate');
-    } catch (e) {
-      debugPrint('Failed to schedule notification: $e');
-    }
+    await _notificationsPlugin.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: notificationDetails,
+      payload: payload,
+    );
   }
 
   /// Cancel notification by ID

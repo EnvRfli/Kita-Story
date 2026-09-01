@@ -77,6 +77,13 @@ class VacationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void resetCalendarAndFilters() {
+    _filterTab = VacationFilterTab.all;
+    _focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+    _selectedDetailDay = null;
+    notifyListeners();
+  }
+
   void setSelectedDetailDay(DateTime day) {
     _selectedDetailDay = DateTime(day.year, day.month, day.day);
     notifyListeners();

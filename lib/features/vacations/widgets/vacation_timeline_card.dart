@@ -20,11 +20,9 @@ class VacationTimelineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCompleted = activity.isCompleted;
-    final isGrey = activityIndex >= 3 && !isCompleted;
-    final nodeColor = isCompleted
+    final primaryColor = isCompleted
         ? const Color(0xFF10B981)
-        : (isGrey ? const Color(0xFFCBD5E1) : const Color(0xFFFFB000));
-    final isHollow = activityIndex < 2 && !isCompleted;
+        : const Color(0xFFFF8A00);
 
     return IntrinsicHeight(
       child: Row(
@@ -35,52 +33,51 @@ class VacationTimelineCard extends StatelessWidget {
             width: 28,
             child: Column(
               children: [
-                // Top line
+                // Top Line (Equal length to bottom line)
                 Expanded(
                   flex: 1,
                   child: Container(
-                    width: 2,
-                    color: isFirst
-                        ? Colors.transparent
-                        : (isCompleted
-                            ? const Color(0xFF10B981)
-                            : (isGrey
-                                ? const Color(0xFFE2E8F0)
-                                : const Color(0xFFFFB000))),
+                    width: 2.5,
+                    color: isFirst ? Colors.transparent : primaryColor,
                   ),
                 ),
-                // Center Node Dot / Ring
+
+                // Center Node Dot / Ring (Vertically centered with the Card)
                 Container(
-                  width: 14,
-                  height: 14,
+                  width: 15,
+                  height: 15,
                   decoration: BoxDecoration(
-                    color: isHollow ? Colors.white : nodeColor,
+                    color: isCompleted ? primaryColor : Colors.white,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: nodeColor,
-                      width: isHollow ? 3.5 : 2.5,
+                      color: primaryColor,
+                      width: isCompleted ? 2.5 : 3.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: nodeColor.withValues(alpha: 0.35),
-                        blurRadius: 4,
+                        color: primaryColor.withValues(alpha: 0.35),
+                        blurRadius: 5,
                         offset: const Offset(0, 1),
                       ),
                     ],
                   ),
+                  child: isCompleted
+                      ? const Center(
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 9,
+                            color: Colors.white,
+                          ),
+                        )
+                      : null,
                 ),
-                // Bottom line
+
+                // Bottom Line (Equal length to top line)
                 Expanded(
-                  flex: 2,
+                  flex: 1,
                   child: Container(
-                    width: 2,
-                    color: isLast
-                        ? Colors.transparent
-                        : (isCompleted
-                            ? const Color(0xFF10B981)
-                            : (isGrey
-                                ? const Color(0xFFE2E8F0)
-                                : const Color(0xFFFFB000))),
+                    width: 2.5,
+                    color: isLast ? Colors.transparent : primaryColor,
                   ),
                 ),
               ],
@@ -88,10 +85,10 @@ class VacationTimelineCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
 
-          // Right Card
+          // Right Card (Symmetrically padded vertically to align with midpoint dot)
           Expanded(
             child: Container(
-              margin: const EdgeInsets.only(bottom: 12),
+              margin: const EdgeInsets.symmetric(vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -118,10 +115,12 @@ class VacationTimelineCard extends StatelessWidget {
                         // Time Range
                         Text(
                           activity.timeRange,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFFFF8A00),
+                            color: isCompleted
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFFF8A00),
                             letterSpacing: -0.1,
                           ),
                         ),
