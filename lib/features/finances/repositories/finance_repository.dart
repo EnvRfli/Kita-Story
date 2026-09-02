@@ -21,32 +21,20 @@ class FinanceRepository {
     return 'Rp ${buffer.toString().split('').reversed.join('')}';
   }
 
-  /// Fetch all personal and shared transactions
+  /// Fetch transactions strictly for the specified user (personal isolation)
   Future<List<TransactionModel>> getTransactions({
     String? targetUserId,
-    String? partnerId,
   }) async {
     final user = _client.auth.currentUser;
     final uid = targetUserId ?? user?.id;
     if (uid == null) return [];
 
     try {
-      dynamic response;
-
-      if (partnerId != null && partnerId.isNotEmpty) {
-        // Query transactions created by user OR shared transactions created by partner
-        response = await _client
-            .from('transactions')
-            .select()
-            .or('user_id.eq.$uid,and(user_id.eq.$partnerId,is_shared.eq.true)')
-            .order('transaction_date', ascending: false);
-      } else {
-        response = await _client
-            .from('transactions')
-            .select()
-            .eq('user_id', uid)
-            .order('transaction_date', ascending: false);
-      }
+      final response = await _client
+          .from('transactions')
+          .select()
+          .eq('user_id', uid)
+          .order('transaction_date', ascending: false);
 
       return (response as List)
           .map((json) => TransactionModel.fromJson(json as Map<String, dynamic>))

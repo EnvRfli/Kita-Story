@@ -262,9 +262,11 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
         final targetUserId = extra?['targetUserId'] as String?;
+        final partnerName = extra?['partnerName'] as String?;
         final isPartnerMode = (extra?['isPartnerMode'] as bool?) ?? false;
         return FinanceScreen(
           targetUserId: targetUserId,
+          partnerName: partnerName,
           isPartnerMode: isPartnerMode,
         );
       },

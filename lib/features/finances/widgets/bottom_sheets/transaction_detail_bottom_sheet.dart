@@ -7,15 +7,18 @@ import 'add_transaction_bottom_sheet.dart';
 
 class TransactionDetailBottomSheet extends StatefulWidget {
   final TransactionModel transaction;
+  final bool isReadOnly;
 
   const TransactionDetailBottomSheet({
     super.key,
     required this.transaction,
+    this.isReadOnly = false,
   });
 
   static Future<void> show(
     BuildContext context, {
     required TransactionModel transaction,
+    bool isReadOnly = false,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -23,6 +26,7 @@ class TransactionDetailBottomSheet extends StatefulWidget {
       isScrollControlled: true,
       builder: (ctx) => TransactionDetailBottomSheet(
         transaction: transaction,
+        isReadOnly: isReadOnly,
       ),
     );
   }
@@ -238,9 +242,10 @@ class _TransactionDetailBottomSheetState
               ),
               const SizedBox(height: 20),
 
-              // 6. Action Buttons: "Ubah" (Blue Gradient) & "Hapus" (Red Gradient)
-              Row(
-                children: [
+              // 6. Action Buttons: "Ubah" (Blue Gradient) & "Hapus" (Red Gradient) (Only for own items)
+              if (!widget.isReadOnly)
+                Row(
+                  children: [
                   // Ubah Button
                   Expanded(
                     child: Container(

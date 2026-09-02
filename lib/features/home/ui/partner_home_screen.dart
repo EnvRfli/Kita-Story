@@ -512,6 +512,7 @@ class _PartnerHomeScreenState extends State<PartnerHomeScreen> {
                     '/finance',
                     extra: {
                       'targetUserId': partner?.id,
+                      'partnerName': partner?.name,
                       'isPartnerMode': true,
                     },
                   );

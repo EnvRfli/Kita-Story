@@ -193,7 +193,6 @@ class FinanceProvider extends ChangeNotifier {
   /// Fetch transactions from server
   Future<void> fetchTransactions({
     String? targetUserId,
-    String? partnerId,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -202,7 +201,6 @@ class FinanceProvider extends ChangeNotifier {
     try {
       _transactions = await _repository.getTransactions(
         targetUserId: targetUserId,
-        partnerId: partnerId,
       );
       _errorMessage = null;
     } catch (e) {

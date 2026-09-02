@@ -12,11 +12,13 @@ import '../widgets/bottom_sheets/transaction_detail_bottom_sheet.dart';
 
 class FinanceScreen extends StatefulWidget {
   final String? targetUserId;
+  final String? partnerName;
   final bool isPartnerMode;
 
   const FinanceScreen({
     super.key,
     this.targetUserId,
+    this.partnerName,
     this.isPartnerMode = false,
   });
 
@@ -35,12 +37,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
 
   void _loadData() {
     final auth = context.read<AuthProvider>();
-    final partnerId = auth.partnerProfile?.id;
     final uid = widget.targetUserId ?? auth.currentUserProfile?.id;
 
     context.read<FinanceProvider>().fetchTransactions(
           targetUserId: uid,
-          partnerId: partnerId,
         );
   }
 
@@ -50,6 +50,17 @@ class _FinanceScreenState extends State<FinanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final myUid = auth.currentUserProfile?.id;
+    final isPartner = widget.isPartnerMode ||
+        (widget.targetUserId != null && widget.targetUserId != myUid);
+
+    final headerTitle = isPartner
+        ? (widget.partnerName != null
+            ? 'Keuangan ${widget.partnerName}'
+            : 'Keuangan Pasangan')
+        : 'Keuangan';
+
     final provider = context.watch<FinanceProvider>();
     final transactions = provider.transactions;
 
@@ -72,16 +83,18 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     ),
                     onPressed: () => context.pop(),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Keuangan',
+                      headerTitle,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF1E293B),
                         letterSpacing: -0.3,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 48), // Symmetrical balancer
@@ -151,7 +164,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                           ),
                         )
                       else if (transactions.isEmpty)
-                        _buildEmptyTransactionState()
+                        _buildEmptyTransactionState(isPartner)
                       else
                         ListView.builder(
                           shrinkWrap: true,
@@ -166,6 +179,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                                 TransactionDetailBottomSheet.show(
                                   context,
                                   transaction: item,
+                                  isReadOnly: isPartner,
                                 );
                               },
                             );
@@ -183,50 +197,52 @@ class _FinanceScreenState extends State<FinanceScreen> {
         ),
       ),
 
-      // 3. Floating Action Button (+)
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFFF9500).withValues(alpha: 0.42),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _openAddTransaction,
-            customBorder: const CircleBorder(),
-            child: Ink(
-              width: 58,
-              height: 58,
-              decoration: const BoxDecoration(
+      // 3. Floating Action Button (+) - Hidden in partner mode
+      floatingActionButton: isPartner
+          ? null
+          : Container(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFFFFB800),
-                    Color(0xFFFF7A00),
-                  ],
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF9500).withValues(alpha: 0.42),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _openAddTransaction,
+                  customBorder: const CircleBorder(),
+                  child: Ink(
+                    width: 58,
+                    height: 58,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFFFFB800),
+                          Color(0xFFFF7A00),
+                        ],
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
                 ),
               ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 32,
-              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _buildEmptyTransactionState() {
+  Widget _buildEmptyTransactionState(bool isPartner) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
@@ -254,18 +270,22 @@ class _FinanceScreenState extends State<FinanceScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Belum ada transaksi',
-            style: TextStyle(
+          Text(
+            isPartner
+                ? 'Pasangan belum mencatat transaksi'
+                : 'Belum ada transaksi',
+            style: const TextStyle(
               fontSize: 14.5,
               fontWeight: FontWeight.w700,
               color: Color(0xFF1E293B),
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Ketuk tombol (+) di bawah untuk mencatat pemasukan atau pengeluaran pertama Anda',
-            style: TextStyle(
+          Text(
+            isPartner
+                ? 'Catatan keuangan yang ditambahkan oleh pasangan akan muncul di sini'
+                : 'Ketuk tombol (+) di bawah untuk mencatat pemasukan atau pengeluaran pertama Anda',
+            style: const TextStyle(
               fontSize: 12.5,
               color: Color(0xFF94A3B8),
             ),
