@@ -7,11 +7,13 @@ import '../models/note_model.dart';
 class NoteCard extends StatelessWidget {
   final NoteModel note;
   final VoidCallback onTap;
+  final bool isGrid;
 
   const NoteCard({
     super.key,
     required this.note,
     required this.onTap,
+    this.isGrid = true,
   });
 
   @override
@@ -24,15 +26,15 @@ class NoteCard extends StatelessWidget {
       duration: const Duration(milliseconds: 200),
       opacity: note.isCompleted ? 0.60 : 1.0,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: isGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: bgColor.withValues(alpha: note.isCompleted ? 0.20 : 0.45),
-              blurRadius: note.isCompleted ? 8 : 14,
-              offset: Offset(0, note.isCompleted ? 3 : 5),
+              color: bgColor.withValues(alpha: note.isCompleted ? 0.18 : 0.38),
+              blurRadius: note.isCompleted ? 6 : 12,
+              offset: Offset(0, note.isCompleted ? 2 : 4),
             ),
           ],
         ),
@@ -40,90 +42,104 @@ class NoteCard extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(20),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              padding: EdgeInsets.symmetric(
+                horizontal: isGrid ? 13 : 18,
+                vertical: isGrid ? 13 : 16,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Title + Sparkle & Completed Badge
-                  Row(
+                  // 1. Top Section: Title & Badges
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Text(
-                          '${note.title} ✨',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: textColor,
-                            letterSpacing: -0.2,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      // Title
+                      Text(
+                        '${note.title} ✨',
+                        style: TextStyle(
+                          fontSize: isGrid ? 14.5 : 16,
+                          fontWeight: FontWeight.w800,
+                          color: textColor,
+                          letterSpacing: -0.2,
                         ),
+                        maxLines: isGrid ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (note.isShared) ...[
-                        Container(
-                          margin: const EdgeInsets.only(right: 6),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.people_rounded,
-                                size: 11,
-                                color: textColor,
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                'Bersama',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: textColor,
+                      const SizedBox(height: 6),
+
+                      // Badges (Shared & Completed)
+                      if (note.isShared || note.isCompleted) ...[
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: [
+                            if (note.isShared)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.people_rounded,
+                                      size: 10,
+                                      color: textColor,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'Bersama',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
+                            if (note.isCompleted)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Selesai ✓',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF16A34A),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
+                        const SizedBox(height: 8),
                       ],
-                      if (note.isCompleted)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'Selesai ✓',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF16A34A),
-                            ),
-                          ),
-                        ),
+
+                      // Content Preview
+                      if (note.isChecklist)
+                        _buildChecklistPreview(textColor, checkedColor)
+                      else
+                        _buildTextPreview(textColor),
                     ],
                   ),
-                  const SizedBox(height: 10),
 
-                  // Content Preview
-                  if (note.isChecklist)
-                    _buildChecklistPreview(textColor, checkedColor)
-                  else
-                    _buildTextPreview(textColor),
-
-                  // Footer: Last Update & Updated By (if shared)
+                  // 2. Bottom Section: Footer (Last Update & Updated By)
                   _buildFooter(context, textColor),
                 ],
               ),
@@ -139,51 +155,52 @@ class NoteCard extends StatelessWidget {
       return Text(
         'Belum ada item checklist',
         style: TextStyle(
-          fontSize: 13,
+          fontSize: isGrid ? 12 : 13,
           fontStyle: FontStyle.italic,
           color: textColor.withValues(alpha: 0.65),
         ),
       );
     }
 
-    final displayItems = note.items.take(4).toList();
-    final hasMore = note.items.length > 4;
+    final maxItems = isGrid ? 3 : 4;
+    final displayItems = note.items.take(maxItems).toList();
+    final hasMore = note.items.length > maxItems;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ...displayItems.map((item) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.only(bottom: 4.5),
             child: Row(
               children: [
                 Container(
-                  width: 17,
-                  height: 17,
+                  width: 15,
+                  height: 15,
                   decoration: BoxDecoration(
                     color: item.isChecked ? checkedColor : Colors.transparent,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(3.5),
                     border: Border.all(
                       color: item.isChecked
                           ? checkedColor
                           : textColor.withValues(alpha: 0.45),
-                      width: 1.4,
+                      width: 1.3,
                     ),
                   ),
                   child: item.isChecked
                       ? const Icon(
                           Icons.check_rounded,
-                          size: 13,
+                          size: 11,
                           color: Colors.white,
                         )
                       : null,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     item.itemText,
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: isGrid ? 12 : 13.5,
                       fontWeight: FontWeight.w600,
                       color: item.isChecked
                           ? textColor.withValues(alpha: 0.55)
@@ -203,11 +220,11 @@ class NoteCard extends StatelessWidget {
         }),
         if (hasMore)
           Padding(
-            padding: const EdgeInsets.only(left: 25, top: 2),
+            padding: const EdgeInsets.only(left: 21, top: 1),
             child: Text(
               '...',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
                 color: textColor.withValues(alpha: 0.75),
               ),
@@ -223,7 +240,7 @@ class NoteCard extends StatelessWidget {
       return Text(
         'Catatan kosong',
         style: TextStyle(
-          fontSize: 13,
+          fontSize: isGrid ? 12 : 13,
           fontStyle: FontStyle.italic,
           color: textColor.withValues(alpha: 0.65),
         ),
@@ -233,12 +250,12 @@ class NoteCard extends StatelessWidget {
     return Text(
       text,
       style: TextStyle(
-        fontSize: 13.5,
+        fontSize: isGrid ? 12 : 13.5,
         fontWeight: FontWeight.w500,
         color: textColor.withValues(alpha: 0.9),
-        height: 1.35,
+        height: 1.3,
       ),
-      maxLines: 3,
+      maxLines: isGrid ? 3 : 3,
       overflow: TextOverflow.ellipsis,
     );
   }
@@ -273,32 +290,36 @@ class NoteCard extends StatelessWidget {
 
     String label = '';
     if (timeStr.isNotEmpty && updater.isNotEmpty) {
-      label = '$timeStr • oleh $updater';
+      label = isGrid ? '$timeStr • $updater' : '$timeStr • oleh $updater';
     } else if (timeStr.isNotEmpty) {
       label = timeStr;
     } else if (updater.isNotEmpty) {
-      label = 'oleh $updater';
+      label = isGrid ? updater : 'oleh $updater';
     }
 
     if (label.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           Icon(
             Icons.access_time_rounded,
-            size: 11.5,
+            size: 10.5,
             color: textColor.withValues(alpha: 0.65),
           ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: textColor.withValues(alpha: 0.70),
+          const SizedBox(width: 3.5),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: isGrid ? 10 : 11,
+                fontWeight: FontWeight.w600,
+                color: textColor.withValues(alpha: 0.70),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

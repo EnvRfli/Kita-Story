@@ -16,6 +16,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../reminders/providers/reminder_provider.dart';
 import '../../reminders/widgets/widgets.dart';
 import '../widgets/cute_home_icon.dart';
+import '../widgets/wavy_menu_card.dart';
 
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
@@ -29,10 +30,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen>
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   late int _currentNavIndex;
   final ImagePicker _picker = ImagePicker();
   bool _isUploadingPhoto = false;
+
+  late AnimationController _idleFloatingController;
+  late AnimationController _entranceController;
 
   // Global Keys for 3D Badge Interactive Tooltip Attachments
   final GlobalKey _homePointKey = GlobalKey();
@@ -46,6 +51,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _currentNavIndex = widget.initialIndex;
+
+    _idleFloatingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    )..repeat(reverse: true);
+
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 750),
+    );
+    _entranceController.forward();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _refreshAllData(showPopupIfNeeded: true);
     });
@@ -53,6 +70,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _idleFloatingController.dispose();
+    _entranceController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -390,42 +409,79 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required String? partnerPhotoUrl,
     required bool isUserLeading,
   }) {
+    final headerAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0.0, 0.45, curve: Curves.easeOutCubic),
+      ),
+    );
+    final partnerAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0.15, 0.65, curve: Curves.easeOutCubic),
+      ),
+    );
+    final menuAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0.30, 0.90, curve: Curves.easeOutCubic),
+      ),
+    );
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        // 3D Decorative Noodles Anchored at Top-Right Corner
-        Positioned(
-          top: -size.height * 0.032,
-          right: size.width * 0.12,
-          child: Transform.rotate(
-            angle: -30 * math.pi / 180,
-            child: Image.asset(
-              'lib/assets/tai/9785753 3.png',
-              width: 120,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-        Positioned(
-          top: size.height * 0.02,
-          right: -size.width * 0.05,
-          child: Transform.rotate(
-            angle: -10 * math.pi / 180,
-            child: Image.asset(
-              'lib/assets/tai/9785753 8.png',
-              width: 60,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-        Positioned(
-          top: size.height * 0.19,
-          right: 1,
-          child: Image.asset(
-            'lib/assets/tai/9785753 9.png',
-            width: 42,
-            fit: BoxFit.contain,
-          ),
+        // 3D Decorative Noodles Anchored at Top-Right Corner with gentle idle floating
+        AnimatedBuilder(
+          animation: _idleFloatingController,
+          builder: (context, _) {
+            final offset1 =
+                math.sin(_idleFloatingController.value * math.pi * 2) * 5.0;
+            final offset2 =
+                math.cos(_idleFloatingController.value * math.pi * 2) * 3.5;
+            final offset3 =
+                math.sin(_idleFloatingController.value * math.pi * 2 + 1.0) *
+                    4.0;
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                Positioned(
+                  top: -size.height * 0.032 + offset1,
+                  right: size.width * 0.12,
+                  child: Transform.rotate(
+                    angle: (-30 + offset1 * 0.3) * math.pi / 180,
+                    child: Image.asset(
+                      'lib/assets/tai/9785753 3.png',
+                      width: 120,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: size.height * 0.02 + offset2,
+                  right: -size.width * 0.05,
+                  child: Transform.rotate(
+                    angle: (-10 + offset2 * 0.4) * math.pi / 180,
+                    child: Image.asset(
+                      'lib/assets/tai/9785753 8.png',
+                      width: 60,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: size.height * 0.19 + offset3,
+                  right: 1,
+                  child: Image.asset(
+                    'lib/assets/tai/9785753 9.png',
+                    width: 42,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
 
         // Scrollable Body with Pull-to-Refresh
@@ -443,41 +499,73 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top Header
-                  _buildHeader(
-                    context: context,
-                    userName: userName,
-                    userPoints: userPoints,
-                    userPhotoUrl: userPhotoUrl,
-                    isUserLeading: isUserLeading,
-                    partnerName: partnerName,
-                    partnerPoints: partnerPoints,
+                  // Top Header (with Entrance Animation)
+                  FadeTransition(
+                    opacity: headerAnim,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.12),
+                        end: Offset.zero,
+                      ).animate(headerAnim),
+                      child: _buildHeader(
+                        context: context,
+                        userName: userName,
+                        userPoints: userPoints,
+                        userPhotoUrl: userPhotoUrl,
+                        isUserLeading: isUserLeading,
+                        partnerName: partnerName,
+                        partnerPoints: partnerPoints,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 40),
 
-                  // Partner Card
-                  _buildPartnerCard(
-                    context: context,
-                    partnerName: partnerName,
-                    partnerPhotoUrl: partnerPhotoUrl,
-                    partnerPoints: partnerPoints,
+                  // Partner Card (with Entrance Animation)
+                  FadeTransition(
+                    opacity: partnerAnim,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.12),
+                        end: Offset.zero,
+                      ).animate(partnerAnim),
+                      child: _buildPartnerCard(
+                        context: context,
+                        partnerName: partnerName,
+                        partnerPhotoUrl: partnerPhotoUrl,
+                        partnerPoints: partnerPoints,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 28),
 
-                  // Section Title
-                  const Text(
-                    'Jelajahi ✨',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF222222),
-                      letterSpacing: -0.3,
+                  // Menu Section Title & Grid (with Entrance Animation)
+                  FadeTransition(
+                    opacity: menuAnim,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.12),
+                        end: Offset.zero,
+                      ).animate(menuAnim),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Jelajahi ✨',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF222222),
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // 2-Column Menu Grid with Wavy Cards
+                          _buildMenuGrid(context),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-
-                  // 2-Column Menu Grid
-                  _buildMenuGrid(context),
                 ],
               ),
             ),
@@ -1197,9 +1285,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   const SizedBox(width: 10),
 
                   // Button "Kunjungi →"
-                  InkWell(
+                  BouncyPressable(
                     onTap: () => _navigateTo('/partner-home'),
-                    borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -1260,7 +1347,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   // ==========================================
-  // WIDGET: 2-COLUMN MENU GRID
+  // WIDGET: 2-COLUMN MENU GRID (Wavy Interactive Cards)
   // ==========================================
   Widget _buildMenuGrid(BuildContext context) {
     return Column(
@@ -1268,7 +1355,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         Row(
           children: [
             Expanded(
-              child: _buildMenuCard(
+              child: WavyMenuCard(
                 title: 'Bacaan',
                 imagePath:
                     'lib/assets/homescreen assets/05june22_phonebook_icon_04 2.png',
@@ -1276,12 +1363,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 imageTop: null,
                 imageBottom: -34,
                 imageWidth: 135,
+                waveColor: const Color(0xFF0088FF),
                 onTap: () => _navigateTo('/books'),
               ),
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: _buildMenuCard(
+              child: WavyMenuCard(
                 title: 'Catatan',
                 imagePath:
                     'lib/assets/homescreen assets/clipboard-with-checklist-paper-note-icon-symbol-purple-background-3d-rendering 2.png',
@@ -1289,6 +1377,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 imageTop: 10,
                 imageBottom: null,
                 imageWidth: 90,
+                waveColor: const Color(0xFF8B5CF6),
                 onTap: () => _navigateTo('/notes'),
               ),
             ),
@@ -1298,25 +1387,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         Row(
           children: [
             Expanded(
-              child: _buildMenuCard(
+              child: WavyMenuCard(
                 title: 'Keuangan',
                 imagePath: 'lib/assets/homescreen assets/7068473 2.png',
                 imageRight: -21,
                 imageTop: 8,
                 imageBottom: null,
                 imageWidth: 100,
+                waveColor: const Color(0xFFFF7A00),
                 onTap: () => _navigateTo('/finance'),
               ),
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: _buildMenuCard(
+              child: WavyMenuCard(
                 title: 'Resep',
                 imagePath: 'lib/assets/homescreen assets/6024348 2.png',
                 imageRight: -25,
                 imageTop: null,
                 imageBottom: -35,
                 imageWidth: 130,
+                waveColor: const Color(0xFF10B981),
                 onTap: () => _navigateTo('/recipes'),
               ),
             ),
@@ -1326,7 +1417,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         Row(
           children: [
             Expanded(
-              child: _buildMenuCard(
+              child: WavyMenuCard(
                 title: 'Pengingat',
                 imagePath:
                     'lib/assets/homescreen assets/a888be4e-bdd0-45c0-8696-821a322cfebc 2.png',
@@ -1334,12 +1425,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 imageTop: -5,
                 imageBottom: null,
                 imageWidth: 120,
+                waveColor: const Color(0xFFFF5252),
                 onTap: () => _navigateTo('/reminders'),
               ),
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: _buildMenuCard(
+              child: WavyMenuCard(
                 title: 'Liburan',
                 imagePath:
                     'lib/assets/homescreen assets/Adobe Express - file 1.png',
@@ -1347,6 +1439,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 imageTop: null,
                 imageBottom: -15,
                 imageWidth: 110,
+                waveColor: const Color(0xFF06B6D4),
                 onTap: () => _navigateTo('/vacations'),
               ),
             ),
@@ -1356,7 +1449,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         Row(
           children: [
             Expanded(
-              child: _buildMenuCard(
+              child: WavyMenuCard(
                 title: 'Riwayat',
                 imagePath:
                     'lib/assets/homescreen assets/386ff72a-ca85-47aa-9eeb-f38d9ab4c154 2.png',
@@ -1364,6 +1457,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 imageTop: null,
                 imageBottom: -15,
                 imageWidth: 110,
+                waveColor: const Color(0xFF6366F1),
                 onTap: () => _navigateTo('/history'),
               ),
             ),
@@ -1372,104 +1466,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildMenuCard({
-    required String title,
-    required String imagePath,
-    required VoidCallback onTap,
-    double? imageTop,
-    double? imageBottom,
-    double? imageRight = 0,
-    double? imageLeft,
-    double? imageWidth = 70,
-    double? imageHeight,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          height: 90,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: Colors.white,
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF2C5FF6).withValues(alpha: 0.05),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: const Color(0xFF000000).withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: Stack(
-              clipBehavior: Clip.hardEdge,
-              children: [
-                Positioned(
-                  left: 18,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF222222),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: imageTop,
-                  bottom: imageBottom ?? (imageTop == null ? 0 : null),
-                  right: imageRight,
-                  left: imageLeft,
-                  child: (imageTop == null && imageBottom == null)
-                      ? Center(
-                          child: Image.asset(
-                            imagePath,
-                            width: imageWidth,
-                            height: imageHeight,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.widgets_rounded,
-                              color: Color(0xFF6155F5),
-                              size: 34,
-                            ),
-                          ),
-                        )
-                      : Image.asset(
-                          imagePath,
-                          width: imageWidth,
-                          height: imageHeight,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.widgets_rounded,
-                            color: Color(0xFF6155F5),
-                            size: 34,
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 

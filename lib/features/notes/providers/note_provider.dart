@@ -44,6 +44,20 @@ class NoteProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Move note directly from fromIndex to toIndex (for GridView drag-and-drop)
+  void moveNote(int fromIndex, int toIndex) {
+    if (fromIndex < 0 ||
+        fromIndex >= _notes.length ||
+        toIndex < 0 ||
+        toIndex >= _notes.length ||
+        fromIndex == toIndex) {
+      return;
+    }
+    final item = _notes.removeAt(fromIndex);
+    _notes.insert(toIndex, item);
+    notifyListeners();
+  }
+
   /// Save the current in-memory order of notes to Supabase
   Future<bool> saveNotesOrder({String? targetUserId}) async {
     try {

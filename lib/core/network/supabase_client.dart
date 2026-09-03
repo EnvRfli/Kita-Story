@@ -12,7 +12,7 @@ class SupabaseNetwork {
 
     await Supabase.initialize(
       url: supabaseUrl,
-      anonKey: supabaseAnonKey,
+      publishableKey: supabaseAnonKey,
     );
   }
 

@@ -27,6 +27,7 @@ import '../../features/vacations/ui/add_vacation_activity_screen.dart';
 import '../../features/vacations/models/vacation_model.dart';
 import '../../features/vacations/models/vacation_activity_model.dart';
 import '../../features/finances/ui/finance_screen.dart';
+import '../../features/finances/ui/all_transactions_screen.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -265,6 +266,20 @@ final GoRouter appRouter = GoRouter(
         final partnerName = extra?['partnerName'] as String?;
         final isPartnerMode = (extra?['isPartnerMode'] as bool?) ?? false;
         return FinanceScreen(
+          targetUserId: targetUserId,
+          partnerName: partnerName,
+          isPartnerMode: isPartnerMode,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/finance/all-transactions',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final targetUserId = extra?['targetUserId'] as String?;
+        final partnerName = extra?['partnerName'] as String?;
+        final isPartnerMode = (extra?['isPartnerMode'] as bool?) ?? false;
+        return AllTransactionsScreen(
           targetUserId: targetUserId,
           partnerName: partnerName,
           isPartnerMode: isPartnerMode,

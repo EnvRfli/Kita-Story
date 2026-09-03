@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -210,7 +209,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                             ? _buildEmptyState()
                             : filteredNotes.isEmpty
                                 ? _buildNoSearchResultsState()
-                                : ReorderableListView.builder(
+                                : GridView.builder(
                                     physics:
                                         const AlwaysScrollableScrollPhysics(
                                       parent: BouncingScrollPhysics(),
@@ -221,57 +220,23 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                       16,
                                       95,
                                     ),
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 12,
+                                      mainAxisSpacing: 12,
+                                      childAspectRatio: 0.85,
+                                    ),
                                     itemCount: filteredNotes.length,
-                                    buildDefaultDragHandles: !widget.isReadOnly &&
-                                        _searchController.text.trim().isEmpty,
-                                    onReorder: (oldIndex, newIndex) {
-                                      HapticFeedback.selectionClick();
-                                      if (!widget.isReadOnly &&
-                                          _searchController.text
-                                              .trim()
-                                              .isEmpty) {
-                                        provider.reorderNotes(
-                                            oldIndex, newIndex);
-                                        setState(() {
-                                          _hasOrderChanged = true;
-                                        });
-                                      }
-                                    },
-                                    proxyDecorator: (Widget child, int index,
-                                        Animation<double> animation) {
-                                      return AnimatedBuilder(
-                                        animation: animation,
-                                        builder: (context, child) {
-                                          final double animValue =
-                                              Curves.easeInOut
-                                                  .transform(animation.value);
-                                          final double elevation =
-                                              lerpDouble(0, 14, animValue)!;
-                                          final double scale =
-                                              lerpDouble(1.0, 1.03, animValue)!;
-                                          return Transform.scale(
-                                            scale: scale,
-                                            child: Material(
-                                              elevation: elevation,
-                                              color: Colors.transparent,
-                                              shadowColor: Colors.black
-                                                  .withValues(alpha: 0.35),
-                                              borderRadius:
-                                                  BorderRadius.circular(22),
-                                              child: child,
-                                            ),
-                                          );
-                                        },
-                                        child: child,
-                                      );
-                                    },
-                                    itemBuilder: (_, index) {
+                                    itemBuilder: (context, index) {
                                       final note = filteredNotes[index];
                                       return KeyedSubtree(
                                         key: ValueKey(note.id),
-                                        child: NoteCard(
-                                          note: note,
-                                          onTap: () => _openNoteDetail(note),
+                                        child: _buildDraggableGridItem(
+                                          index,
+                                          note,
+                                          provider,
+                                          filteredNotes,
                                         ),
                                       );
                                     },
@@ -474,6 +439,85 @@ class _NoteListScreenState extends State<NoteListScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDraggableGridItem(
+    int index,
+    NoteModel note,
+    NoteProvider provider,
+    List<NoteModel> filteredNotes,
+  ) {
+    final cardWidget = NoteCard(
+      note: note,
+      isGrid: true,
+      onTap: () => _openNoteDetail(note),
+    );
+
+    // Disable drag and drop if in read-only mode or searching
+    if (widget.isReadOnly || _searchController.text.trim().isNotEmpty) {
+      return cardWidget;
+    }
+
+    return DragTarget<int>(
+      onWillAcceptWithDetails: (details) {
+        return details.data != index;
+      },
+      onAcceptWithDetails: (details) {
+        final fromIndex = details.data;
+        final toIndex = index;
+        if (fromIndex != toIndex) {
+          HapticFeedback.selectionClick();
+          provider.moveNote(fromIndex, toIndex);
+          setState(() {
+            _hasOrderChanged = true;
+          });
+        }
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHovered = candidateData.isNotEmpty;
+
+        return AnimatedScale(
+          scale: isHovered ? 1.04 : 1.0,
+          duration: const Duration(milliseconds: 180),
+          child: LongPressDraggable<int>(
+            data: index,
+            feedback: Material(
+              color: Colors.transparent,
+              child: SizedBox(
+                width: (MediaQuery.of(context).size.width - 32 - 12) / 2,
+                height:
+                    ((MediaQuery.of(context).size.width - 32 - 12) / 2) / 0.85,
+                child: Opacity(
+                  opacity: 0.92,
+                  child: Transform.scale(
+                    scale: 1.05,
+                    child: NoteCard(
+                      note: note,
+                      isGrid: true,
+                      onTap: () {},
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            childWhenDragging: Opacity(
+              opacity: 0.30,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFFFF7A00).withValues(alpha: 0.5),
+                    width: 2.0,
+                  ),
+                ),
+                child: cardWidget,
+              ),
+            ),
+            child: cardWidget,
+          ),
+        );
+      },
     );
   }
 

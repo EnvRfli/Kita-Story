@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/finance_category_model.dart';
+import '../models/finance_filter_model.dart';
 import '../models/transaction_model.dart';
 import '../repositories/finance_repository.dart';
 
@@ -24,8 +25,28 @@ class FinanceProvider extends ChangeNotifier {
   List<TransactionModel> _transactions = [];
   List<TransactionModel> get transactions => _transactions;
 
+  // Pagination for All Transactions Screen (15 items per fetch)
+  static const int _pageSize = 15;
+  List<TransactionModel> _pagedTransactions = [];
+  List<TransactionModel> get pagedTransactions => _pagedTransactions;
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+
+  bool _isLoadingPaged = false;
+  bool get isLoadingPaged => _isLoadingPaged;
+
+  bool _isLoadingMore = false;
+  bool get isLoadingMore => _isLoadingMore;
+
+  bool _hasMore = true;
+  bool get hasMore => _hasMore;
+
+  int _currentOffset = 0;
+
+  // Filter State
+  FinanceFilterModel _filter = const FinanceFilterModel();
+  FinanceFilterModel get filter => _filter;
 
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
@@ -58,6 +79,16 @@ class FinanceProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('finance_is_balance_visible', _isBalanceVisible);
+  }
+
+  void setFilter(FinanceFilterModel newFilter) {
+    _filter = newFilter;
+    notifyListeners();
+  }
+
+  void resetFilter() {
+    _filter = const FinanceFilterModel();
+    notifyListeners();
   }
 
   Future<void> addCustomCategory(String name, {required bool isExpense}) async {
@@ -104,6 +135,61 @@ class FinanceProvider extends ChangeNotifier {
       if (t.isExpense) set.add(t.category);
     }
     return set.toList();
+  }
+
+  /// All Unique Categories (Income + Expense)
+  List<String> get allCategories {
+    final set = <String>{...allIncomeCategoryNames, ...allExpenseCategoryNames};
+    return set.toList();
+  }
+
+  /// Transaksi Hari Ini
+  List<TransactionModel> get todayTransactions {
+    final now = DateTime.now();
+    return _transactions.where((t) {
+      final d = t.transactionDate;
+      return d.year == now.year && d.month == now.month && d.day == now.day;
+    }).toList();
+  }
+
+  /// Total Net Transaksi Hari Ini (Income - Expense)
+  double get todayNetTotal {
+    double total = 0.0;
+    for (final t in todayTransactions) {
+      if (t.isIncome) {
+        total += t.amount;
+      } else {
+        total -= t.amount;
+      }
+    }
+    return total;
+  }
+
+  /// Total Pemasukan Hari Ini
+  double get todayIncome {
+    double total = 0.0;
+    for (final t in todayTransactions) {
+      if (t.isIncome) {
+        total += t.amount;
+      }
+    }
+    return total;
+  }
+
+  /// Total Pengeluaran Hari Ini
+  double get todayExpense {
+    double total = 0.0;
+    for (final t in todayTransactions) {
+      if (t.isExpense) {
+        total += t.amount;
+      }
+    }
+    return total;
+  }
+
+  /// 5 Transaksi Terakhir untuk section Riwayat Transaksi di Main Screen
+  List<TransactionModel> get recentTransactions {
+    return _transactions.take(5).toList();
   }
 
   /// Total Cumulative Balance (All-Time Income - All-Time Expense)
@@ -190,7 +276,7 @@ class FinanceProvider extends ChangeNotifier {
     }).toList();
   }
 
-  /// Fetch transactions from server
+  /// Fetch overview transactions from server
   Future<void> fetchTransactions({
     String? targetUserId,
   }) async {
@@ -208,6 +294,86 @@ class FinanceProvider extends ChangeNotifier {
       debugPrint(_errorMessage);
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  FinanceFilterModel _activePagedFilter = const FinanceFilterModel();
+  FinanceFilterModel get activePagedFilter => _activePagedFilter;
+
+  /// Fetch Initial Paged Transactions for All Transactions Screen (15 items)
+  Future<void> fetchInitialPagedTransactions({
+    String? targetUserId,
+    FinanceFilterModel? filter,
+  }) async {
+    if (filter != null) {
+      _activePagedFilter = filter;
+    }
+    _isLoadingPaged = true;
+    _currentOffset = 0;
+    _hasMore = true;
+    _pagedTransactions = [];
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final list = await _repository.getTransactionsPaged(
+        targetUserId: targetUserId,
+        filter: _activePagedFilter,
+        limit: _pageSize,
+        offset: 0,
+      );
+      _pagedTransactions = list;
+      _currentOffset = list.length;
+      if (list.length < _pageSize) {
+        _hasMore = false;
+      }
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = 'Gagal memuat transaksi: $e';
+      debugPrint(_errorMessage);
+    } finally {
+      _isLoadingPaged = false;
+      notifyListeners();
+    }
+  }
+
+  /// Fetch More Paged Transactions when user scrolls to bottom (15 items per fetch)
+  Future<void> fetchMoreTransactions({
+    String? targetUserId,
+    FinanceFilterModel? filter,
+  }) async {
+    if (_isLoadingMore || !_hasMore || _isLoadingPaged) return;
+
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      final list = await _repository.getTransactionsPaged(
+        targetUserId: targetUserId,
+        filter: filter ?? _activePagedFilter,
+        limit: _pageSize,
+        offset: _currentOffset,
+      );
+
+      if (list.isNotEmpty) {
+        // Prevent duplicate IDs
+        final existingIds = _pagedTransactions.map((t) => t.id).toSet();
+        for (final item in list) {
+          if (!existingIds.contains(item.id)) {
+            _pagedTransactions.add(item);
+          }
+        }
+        _currentOffset += list.length;
+      }
+
+      if (list.length < _pageSize) {
+        _hasMore = false;
+      }
+    } catch (e) {
+      debugPrint('Error fetching more transactions: $e');
+    } finally {
+      _isLoadingMore = false;
       notifyListeners();
     }
   }
@@ -237,6 +403,11 @@ class FinanceProvider extends ChangeNotifier {
 
       _transactions.insert(0, newTransaction);
       _transactions.sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
+
+      // Also prepend to paged transactions if loaded
+      _pagedTransactions.removeWhere((t) => t.id == newTransaction.id);
+      _pagedTransactions.insert(0, newTransaction);
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -275,8 +446,14 @@ class FinanceProvider extends ChangeNotifier {
       if (index != -1) {
         _transactions[index] = updated;
         _transactions.sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
-        notifyListeners();
       }
+
+      final pagedIndex = _pagedTransactions.indexWhere((t) => t.id == transactionId);
+      if (pagedIndex != -1) {
+        _pagedTransactions[pagedIndex] = updated;
+      }
+
+      notifyListeners();
       return true;
     } catch (e) {
       _errorMessage = e.toString();
@@ -290,6 +467,7 @@ class FinanceProvider extends ChangeNotifier {
     try {
       await _repository.deleteTransaction(transactionId);
       _transactions.removeWhere((t) => t.id == transactionId);
+      _pagedTransactions.removeWhere((t) => t.id == transactionId);
       notifyListeners();
       return true;
     } catch (e) {
