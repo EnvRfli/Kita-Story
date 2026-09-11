@@ -201,7 +201,18 @@ class HistoryCard extends StatelessWidget {
       );
     }
 
-    // 2. Add / Create (Blue)
+    // 3. Credential / Vault (Indigo / Violet)
+    if (typeLower.contains('credential') ||
+        titleLower.contains('kredensial') ||
+        titleLower.contains('brankas')) {
+      return _ActivityVisuals(
+        icon: Icons.lock_rounded,
+        iconColor: const Color(0xFF6366F1),
+        backgroundColor: const Color(0xFFEEF2FF),
+      );
+    }
+
+    // 4. Add / Create (Blue)
     if (typeLower.contains('add') ||
         typeLower.contains('create') ||
         titleLower.contains('tambah') ||

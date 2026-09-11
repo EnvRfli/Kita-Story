@@ -28,6 +28,10 @@ import '../../features/vacations/models/vacation_model.dart';
 import '../../features/vacations/models/vacation_activity_model.dart';
 import '../../features/finances/ui/finance_screen.dart';
 import '../../features/finances/ui/all_transactions_screen.dart';
+import '../../features/credentials/ui/credentials_screen.dart';
+import '../../features/credentials/ui/add_credential_screen.dart';
+import '../../features/credentials/models/credential_model.dart';
+import '../../features/games/ui/games_screen.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -285,6 +289,22 @@ final GoRouter appRouter = GoRouter(
           isPartnerMode: isPartnerMode,
         );
       },
+    ),
+    // --- CREDENTIALS & GAMES MODULES ---
+    GoRoute(
+      path: '/credentials',
+      builder: (context, state) => const CredentialsScreen(),
+    ),
+    GoRoute(
+      path: '/add-credential',
+      builder: (context, state) {
+        final credentialToEdit = state.extra as CredentialModel?;
+        return AddCredentialScreen(credentialToEdit: credentialToEdit);
+      },
+    ),
+    GoRoute(
+      path: '/games',
+      builder: (context, state) => const GamesScreen(),
     ),
   ],
 );

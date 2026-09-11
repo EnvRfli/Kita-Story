@@ -17,6 +17,7 @@ import '../../reminders/providers/reminder_provider.dart';
 import '../../reminders/widgets/widgets.dart';
 import '../widgets/cute_home_icon.dart';
 import '../widgets/wavy_menu_card.dart';
+import '../../credentials/widgets/pin_auth_bottom_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
@@ -1441,6 +1442,41 @@ class _HomeScreenState extends State<HomeScreen>
                 imageWidth: 110,
                 waveColor: const Color(0xFF06B6D4),
                 onTap: () => _navigateTo('/vacations'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: WavyMenuCard(
+                title: 'Kredensial',
+                imagePath: 'lib/assets/homescreen assets/lock.png',
+                imageRight: -32,
+                imageTop: null,
+                imageBottom: -15,
+                imageWidth: 120,
+                waveColor: const Color(0xFF4F46E5),
+                onTap: () {
+                  PinAuthBottomSheet.show(
+                    context,
+                    onSuccess: () => _navigateTo('/credentials'),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: WavyMenuCard(
+                title: 'Game',
+                imagePath: 'lib/assets/homescreen assets/controller.png',
+                imageRight: -20,
+                imageTop: null,
+                imageBottom: -12,
+                imageWidth: 120,
+                waveColor: const Color(0xFFEC4899),
+                onTap: () => _navigateTo('/games'),
               ),
             ),
           ],
