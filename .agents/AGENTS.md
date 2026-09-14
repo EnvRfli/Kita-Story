@@ -1,6 +1,6 @@
-# Kita Story Agent Rules & Knowledge Base
+# Day Tale Agent Rules & Knowledge Base
 
-Selamat datang di repositori **Kita Story**! Dokumen ini adalah panduan lengkap arsitektur, standar kode, desain UI/UX, konvensi database, dan pengetahuan seluruh fitur untuk setiap AI Agent yang bekerja di proyek ini.
+Selamat datang di repositori **Day Tale**! Dokumen ini adalah panduan lengkap arsitektur, standar kode, desain UI/UX, konvensi database, dan pengetahuan seluruh fitur untuk setiap AI Agent yang bekerja di proyek ini.
 
 ---
 
@@ -84,9 +84,43 @@ Selamat datang di repositori **Kita Story**! Dokumen ini adalah panduan lengkap 
 * Perencanaan liburan dengan rentang tanggal kalender, status liburan aktif/mendatang/selesai.
 * Timeline agenda harian (waktu mulai-selesai, deskripsi, status selesai) dengan visual garis berakar.
 
-### G. Gamifikasi & Activity Ledger (`lib/features/history`, `lib/core/services/activity_log_service.dart`)
+### G. Keuangan & Budgeting Tracker (`lib/features/finances`)
+* Kartu saldo total gradien ungu 3D dengan kalkulasi otomatis *Sisa Bersih Tabungan Bulan Ini* (`Pemasukan - Pengeluaran`).
+* Kartu ganda pemasukan (toska) dan pengeluaran (koral) per periode berjalan.
+* Donut chart kategori pengeluaran murni Flutter `CustomPainter` dengan legenda dinamis.
+* Transaksi harian dengan modal detail untuk ubah/hapus dan filter periode kalender.
+
+### H. Brankas Kredensial & PIN Keamanan (`lib/features/credentials`, `lib/core/services/encryption_service.dart`)
+* **Autentikasi PIN Keamanan 6 Digit (`PinAuthBottomSheet`, `user_security_pins`)**:
+  * Desain titik-titik rata tengah dengan animasi *peek* (angka muncul sekilas lalu kembali menjadi titik).
+  * Input angka murni (*number only*), auto-reset input jika salah memasukkan PIN.
+  * Hashing satu arah aman dengan salt per user (SHA-256) di tabel `user_security_pins`.
+* **Field Kredensial Murni Dinamis (`CredentialField`)**:
+  * Tidak ada field *hardcoded* (username/password wajib). Pengguna bebas menyimpan 1 nilai (misal: *SSH IP*, *PIN*) atau multi-nilai (misal: *Email + Password + Token*).
+  * Form minimalis: Field Tetap hanya **Judul** (*required*) dan **Keterangan** (*opsional*).
+  * Tombol `+ Tambah Field Baru` menambahkan kartu field kustom dinamis secara instan.
+  * *Auto-obscure*: Jika label mengandung kata *sandi*, *pass*, *pin*, atau *secret*, nilai otomatis disamarkan (*obscured*).
+* **Enkripsi Database Dua Arah (AES-256-CBC) (`EncryptionService`)**:
+  * Standar industri brankas password (seperti Bitwarden / 1Password).
+  * Seluruh data field dinamis dienkripsi ke kolom `encrypted_data` di tabel `user_credentials`.
+  * Di server Supabase data berupa ciphertext aman (`<iv>:<ciphertext>`), dan didekripsi otomatis saat dibaca di aplikasi.
+* **Kredensial Bersama Pasangan (*Shared Credential*)**:
+  * Toggle "Kredensial Bersama" untuk membagikan akun/kredensial ke pasangan secara dua arah.
+  * Badge visual "Bersama" (ikon hati biru pastel) pada kartu daftar dan modal detail.
+* **Detail Bottom Sheet Ramping**:
+  * Container field ramping berukuran ~46px (`minHeight: 46`, padding `vertical: 8`, `borderRadius: 12`) tanpa *touch target bloat*.
+  * Tombol salin *copy* (`InkWell`) untuk menyalin nilai secara cepat dengan notifikasi `AppSnackBar`.
+  * Tombol mata di pojok kanan atas untuk menyamarkan / membuka seluruh nilai sekaligus.
+* **Aturan Gamifikasi Kredensial**:
+  * **PENTING**: Gamifikasi **HANYA** berlaku saat **menambah kredensial baru** (`addCredential`):
+    * Kredensial Bersama: **`+10 Poin`** (`activityType: 'add_shared_credential'`).
+    * Kredensial Pribadi: **`+5 Poin`** (`activityType: 'add_credential'`).
+  * Mengedit (`updateCredential`) dan Menghapus (`deleteCredential`) **TIDAK** memberikan/mengurangi poin dan **TIDAK** mencatat riwayat (sesuai instruksi pengguna).
+
+### I. Gamifikasi & Activity Ledger (`lib/features/history`, `lib/core/services/activity_log_service.dart`)
 * Setiap tindakan menghasilkan poin otomatis yang dicatat ke `app_users.points` dan tabel `user_point_logs`.
 * Layar Riwayat (`history_screen.dart`) menampilkan log aktivitas secara kronologis dengan pencarian real-time.
+* Kartu riwayat memiliki visual ikon spesifik (gembok ungu untuk kredensial, pesawat untuk liburan, buku untuk bacaan, centang untuk checklist).
 
 ---
 
@@ -99,6 +133,9 @@ Selamat datang di repositori **Kita Story**! Dokumen ini adalah panduan lengkap 
    * Pada pembaruan row, sertakan `last_updated_by`.
 3. **Penyelarasan Poin**:
    * Selalu gunakan `ActivityLogService.recordActivityAndAddPoints(...)` untuk memastikan poin dan log riwayat tersimpan secara sinkron.
+4. **Keamanan Data Sensitif (Enkripsi vs Hashing)**:
+   * **PIN Keamanan**: Gunakan *One-Way Hash* dengan salt (`user_security_pins.pin_hash`). Data tidak dapat dibalik.
+   * **Data Kredensial / Password / Rekening**: Gunakan *Symmetric Encryption (AES-256-CBC)* via `EncryptionService` ke kolom `encrypted_data`. **Dilarang keras menyimpan password/PIN brankas dalam bentuk plain text**.
 
 ---
 
@@ -106,3 +143,4 @@ Selamat datang di repositori **Kita Story**! Dokumen ini adalah panduan lengkap 
 
 * Sebelum membuat atau memodifikasi modul baru, selalu periksa [`spec.md`](file:///c:/Users/CAS-NB-0024/personal_project/Kita-Story/spec.md).
 * Pastikan menjalankan `dart analyze lib/` setelah melakukan perubahan kode untuk menjamin **0 Error, 0 Warning**.
+

@@ -58,6 +58,30 @@
 * **Donut Chart Kategori Pengeluaran:** Grafik donut murni Flutter `CustomPainter` yang membagi segmen pengeluaran secara proporsional beserta legenda persentase dinamis.
 * **Riwayat Transaksi & Form Input:** Bottom sheet pencatatan transaksi dengan toggle tipe (Pemasukan/Pengeluaran), pilihan chip kategori dinamis (dengan opsi tambah kategori kustom), format angka rupiah otomatis, serta modal detail transaksi untuk mengubah dan menghapus data.
 
+### I. Brankas Kredensial & Keamanan PIN (`lib/features/credentials`, `lib/core/services/encryption_service.dart`)
+* **Autentikasi PIN Keamanan 6 Digit (`PinAuthBottomSheet`, `user_security_pins`):**
+  * Desain titik-titik rata tengah interaktif dengan animasi *peek* (angka tampil sekilas lalu kembali menjadi titik bertopeng).
+  * Validasi *number only* dan pembersihan input instan (*auto-clear*) jika pengguna salah memasukkan PIN.
+  * Hashing satu arah aman ber-salt per user (SHA-256) tersimpan pada tabel `user_security_pins`.
+* **Field Kredensial Murni Dinamis (`CredentialField`):**
+  * Fleksibilitas tinggi tanpa batasan kolom kaku (cocok untuk akun login, SSH IP server, PIN kartu, token, dsb).
+  * Form minimalis: Field wajib hanya **Judul** dan field opsional **Keterangan**.
+  * Tombol `+ Tambah Field Baru` menambahkan kartu kustom dinamis berpasangan (Label + Nilai) dengan kemampuan hapus baris.
+  * Fitur *Auto-Obscure* cerdas yang otomatis menyamarkan nilai jika label mengandung kata kunci sensitif (*sandi, pass, pin, secret*).
+* **Enkripsi Database Dua Arah (AES-256-CBC) (`EncryptionService`):**
+  * Data kredensial diserialisasi ke JSON terenkripsi AES-256 dengan IV unik sebelum disimpan di kolom `encrypted_data` pada tabel `user_credentials`.
+  * Menjamin kerahasiaan 100% di tingkat database (hanya tampak berupa *ciphertext* acak), namun tetap dapat didekripsi dan disalin (*copy*) secara transparan oleh pemilik di aplikasi.
+* **Sinkronisasi Pasangan (*Shared Credential*):**
+  * Switch toggle "Kredensial Bersama" untuk mengizinkan pasangan membaca data kredensial di aplikasinya.
+  * Badge visual "Bersama" (ikon hati biru) pada kartu daftar dan bottom sheet detail.
+* **Detail Bottom Sheet Ramping & Fitur Salin:**
+  * Container field ramping (~46px) dengan titik dua sejajar rapi, tombol salin cepat ke clipboard, dan toggle mata untuk menyamarkan seluruh data.
+* **Gamifikasi Kredensial:**
+  * **Hanya saat menambah kredensial baru** (`addCredential`):
+    * Kredensial Bersama Pasangan: **`+10 Poin`** (`add_shared_credential`)
+    * Kredensial Pribadi: **`+5 Poin`** (`add_credential`)
+  * Ubah & Hapus tidak memberikan/mengurangi poin (0 poin).
+
 ---
 
 ## 3. Technical Stack & Architecture
@@ -67,6 +91,7 @@
 * **Navigation & Routing:** `go_router` (`context.push`, `context.go`, `context.pop`, `context.canPop()`)
 * **Backend & Database:** Supabase (PostgreSQL, Row Level Security, Auth, Storage)
 * **Local Storage:** `shared_preferences`
+* **Security & Cryptography:** `encrypt` (AES-256-CBC), `crypto` (SHA-256 Salted Hash)
 * **Design Guidelines:** Pastel Aesthetics, Soft Drop Shadows, 16-24px Rounded Corners, Symmetric Header Bar, Real-time Search Bars.
 
 ---
@@ -78,13 +103,14 @@ lib/
 ├── core/
 │   ├── network/            # Konfigurasi Supabase Client (SupabaseNetwork.client)
 │   ├── router/             # Konfigurasi go_router
-│   ├── services/           # ActivityLogService, NotificationService, SupabaseStorageService, GeminiOcrService
+│   ├── services/           # ActivityLogService, EncryptionService, NotificationService, SupabaseStorageService, GeminiOcrService
 │   ├── theme/              # AppColors, AppTheme, Gradients
 │   ├── utils/              # AppSnackBar, Helpers
 │   └── widgets/            # ImageCropDialog, GradientAvatar, BouncyPressable, BottomSheet
 ├── features/
 │   ├── auth/               # Autentikasi, Registrasi & Pasangan
 │   ├── books/              # Library, Progres, Karakter, Snippet, Notes
+│   ├── credentials/        # Brankas Kredensial, Dynamic Fields, AES-256, PIN Auth Bottom Sheet
 │   ├── finances/           # Keuangan, Saldo, Donut Chart, Transaksi, Form & Detail
 │   ├── history/            # Riwayat & Log Aktivitas Pengguna
 │   ├── home/               # Dashboard Utama & Partner Profile Home
@@ -101,6 +127,8 @@ lib/
 
 | Menu | Aktivitas | `activity_type` | Poin | Judul Log | Deskripsi Log |
 | :--- | :--- | :--- | :---: | :--- | :--- |
+| **Kredensial** | Simpan Kredensial Bersama | `add_shared_credential` | **`+10`** | `Menyimpan Kredensial Bersama 🔐💕` | `Menyimpan data "[Judul]" ke brankas bersama pasangan` |
+| **Kredensial** | Simpan Kredensial Pribadi | `add_credential` | **`+5`** | `Menyimpan Kredensial 🔐` | `Menyimpan data "[Judul]" ke brankas pribadi` |
 | **Keuangan** | Catat Pemasukan Baru | `add_income` | **`+5`** | `Mencatat Pemasukan 💵` | `Mencatat pemasukan "[Judul]" (+Rp [Nominal])` |
 | **Keuangan** | Catat Pengeluaran Baru | `add_expense` | **`+3`** | `Mencatat Pengeluaran 💳` | `Mencatat pengeluaran "[Judul]" (-Rp [Nominal])` |
 | **Keuangan** | Update / Koreksi Transaksi | `edit_transaction` | **`+2`** | `Memperbarui Transaksi 📝` | `Memperbarui catatan transaksi "[Judul]"` |
@@ -318,5 +346,45 @@ CREATE TABLE IF NOT EXISTS user_point_logs (
   points_earned INTEGER NOT NULL,
   reference_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 8. Credentials & Security Vault Module
+CREATE TABLE IF NOT EXISTS user_security_pins (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  pin_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS credential_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS credential_subcategories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  category_id UUID NOT NULL REFERENCES credential_categories(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS user_credentials (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  category_id UUID REFERENCES credential_categories(id) ON DELETE SET NULL,
+  category_name TEXT NOT NULL,
+  subcategory_id UUID REFERENCES credential_subcategories(id) ON DELETE SET NULL,
+  subcategory_name TEXT NOT NULL,
+  title TEXT NOT NULL,
+  encrypted_data TEXT,
+  keterangan TEXT,
+  is_shared_with_partner BOOLEAN NOT NULL DEFAULT false,
+  partner_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
