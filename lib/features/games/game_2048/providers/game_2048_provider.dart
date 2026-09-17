@@ -22,13 +22,16 @@ class Game2048Provider extends ChangeNotifier {
     required Game2048Engine engine,
     required Game2048LocalStorage storage,
     this.animationDuration = const Duration(milliseconds: 170),
+    DateTime Function()? clock,
   })  : _engine = engine,
-        _storage = storage;
+        _storage = storage,
+        _clock = clock ?? DateTime.now;
 
   static const int _initialUndos = 3;
 
   final Game2048Engine _engine;
   final Game2048LocalStorage _storage;
+  final DateTime Function() _clock;
   final Duration animationDuration;
 
   List<Game2048Tile> _tiles = const [];
@@ -60,7 +63,11 @@ class Game2048Provider extends ChangeNotifier {
   int get moveCount => _moveCount;
 
   int _elapsedSeconds = 0;
-  int get elapsedSeconds => _elapsedSeconds;
+  int get elapsedSeconds =>
+      _elapsedSeconds +
+      (_isElapsedRunning
+          ? max(0, _clock().difference(_elapsedLastResumedAt).inSeconds)
+          : 0);
 
   int _undosLeft = _initialUndos;
   int get undosLeft => _undosLeft;
@@ -79,7 +86,9 @@ class Game2048Provider extends ChangeNotifier {
 
   bool _celebrationPending = false;
   bool _gameOverPending = false;
-  DateTime _startedAt = DateTime.now();
+  bool _isElapsedRunning = false;
+  late DateTime _elapsedLastResumedAt;
+  late DateTime _startedAt;
 
   Future<void> newGame() async {
     _status = Game2048Status.loading;
@@ -102,7 +111,8 @@ class Game2048Provider extends ChangeNotifier {
       _isInputLocked = false;
       _celebrationPending = false;
       _gameOverPending = false;
-      _startedAt = DateTime.now();
+      _startedAt = _clock();
+      _resumeElapsed();
       _status = Game2048Status.playing;
     } on Object {
       _status = Game2048Status.error;
@@ -116,7 +126,11 @@ class Game2048Provider extends ChangeNotifier {
 
     try {
       final snapshot = await _storage.load();
+      final savedBestScore = await _storage.loadBestScore();
       if (snapshot == null) {
+        _resetEmptyGame(savedBestScore);
+        _status = Game2048Status.playing;
+        notifyListeners();
         return false;
       }
 
@@ -128,9 +142,10 @@ class Game2048Provider extends ChangeNotifier {
         ..clear()
         ..addAll(_milestonesThrough(snapshot.highestMilestone));
       _score = snapshot.score;
-      _bestScore = max(await _storage.loadBestScore(), snapshot.bestScore);
+      _bestScore = max(savedBestScore, snapshot.bestScore);
       _moveCount = snapshot.moveCount;
       _elapsedSeconds = snapshot.elapsedSeconds;
+      _isElapsedRunning = false;
       _undosLeft = snapshot.undosLeft.clamp(0, _initialUndos);
       _highestTile = _highestTileFor(_tiles);
       _highestMilestone = snapshot.highestMilestone;
@@ -142,6 +157,7 @@ class Game2048Provider extends ChangeNotifier {
       _status = _engine.hasAvailableMove(_tiles)
           ? Game2048Status.playing
           : Game2048Status.gameOver;
+      if (_status == Game2048Status.playing) _resumeElapsed();
       notifyListeners();
       return true;
     } on Object {
@@ -183,7 +199,10 @@ class Game2048Provider extends ChangeNotifier {
             ? Game2048Status.gameOver
             : Game2048Status.playing;
     _celebrationPending = false;
-    _gameOverPending = false;
+    if (statusAfterSave != Game2048Status.celebrating2048) {
+      _gameOverPending = false;
+    }
+    if (statusAfterSave != Game2048Status.playing) _pauseElapsed();
     await _saveActive(statusAfterSave);
   }
 
@@ -209,17 +228,22 @@ class Game2048Provider extends ChangeNotifier {
     _highestMilestone = snapshot.highestMilestone;
     _hasCelebrated2048 = snapshot.hasCelebrated2048;
     _undosLeft--;
+    _resumeElapsed();
     await _saveActive(Game2048Status.playing);
     return true;
   }
 
   void continueAfter2048() {
     if (_status != Game2048Status.celebrating2048) return;
-    _status = Game2048Status.playing;
+    _status =
+        _gameOverPending ? Game2048Status.gameOver : Game2048Status.playing;
+    _gameOverPending = false;
+    if (_status == Game2048Status.playing) _resumeElapsed();
     notifyListeners();
   }
 
   Future<void> finishRun() async {
+    _pauseElapsed();
     _status = Game2048Status.saving;
     notifyListeners();
     try {
@@ -240,7 +264,7 @@ class Game2048Provider extends ChangeNotifier {
         undoSnapshots: includeUndoHistory ? _undoSnapshots : const [],
         undosLeft: _undosLeft,
         moveCount: _moveCount,
-        elapsedSeconds: _elapsedSeconds,
+        elapsedSeconds: elapsedSeconds,
         hasCelebrated2048: _hasCelebrated2048,
         highestMilestone: _highestMilestone,
         startedAt: _startedAt,
@@ -269,9 +293,49 @@ class Game2048Provider extends ChangeNotifier {
       await _storage.saveBestScore(_bestScore);
       _status = statusAfterSave;
     } on Object {
+      _pauseElapsed();
       _status = Game2048Status.error;
     }
     notifyListeners();
+  }
+
+  void _resetEmptyGame(int bestScore) {
+    _tiles = const [];
+    _undoSnapshots = const [];
+    _transitions = const [];
+    _merges = const [];
+    _pendingMilestoneSet.clear();
+    _score = 0;
+    _bestScore = bestScore;
+    _moveCount = 0;
+    _elapsedSeconds = 0;
+    _undosLeft = _initialUndos;
+    _highestTile = 0;
+    _highestMilestone = 0;
+    _hasCelebrated2048 = false;
+    _isInputLocked = false;
+    _celebrationPending = false;
+    _gameOverPending = false;
+    _isElapsedRunning = false;
+    _startedAt = _clock();
+    _elapsedLastResumedAt = _startedAt;
+  }
+
+  void _pauseElapsed() {
+    if (!_isElapsedRunning) return;
+    _elapsedSeconds = elapsedSeconds;
+    _isElapsedRunning = false;
+  }
+
+  void _resumeElapsed() {
+    _elapsedLastResumedAt = _clock();
+    _isElapsedRunning = true;
+  }
+
+  @override
+  void dispose() {
+    _pauseElapsed();
+    super.dispose();
   }
 
   static int _highestTileFor(List<Game2048Tile> tiles) =>

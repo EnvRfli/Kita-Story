@@ -221,6 +221,70 @@ void main() {
       expect(provider.pendingMilestones, contains(4096));
     });
 
+    test('enters game over after dismissing a terminal 2048 celebration',
+        () async {
+      final provider = Game2048Provider(
+        engine: ScriptedEngine(
+          initialTiles: [tile(1, 1024), tile(2, 1024)],
+          results: [
+            result(tiles: [tile(3, 2048)], scoreGained: 2048)
+          ],
+          hasAvailableMoves: false,
+        ),
+        storage: MemoryStorage(),
+      );
+      await provider.newGame();
+
+      provider.swipe(Game2048Direction.left);
+      await provider.completeAnimation();
+      expect(provider.status, Game2048Status.celebrating2048);
+
+      provider.continueAfter2048();
+
+      expect(provider.status, Game2048Status.gameOver);
+    });
+
+    test('tracks elapsed time with a clock and restores undo duration',
+        () async {
+      var currentTime = DateTime.utc(2026, 9, 17, 12);
+      final storage = MemoryStorage();
+      final provider = Game2048Provider(
+        engine: ScriptedEngine(
+          initialTiles: [tile(1, 2), tile(2, 2)],
+          results: [
+            result(tiles: [tile(3, 4)], scoreGained: 4)
+          ],
+        ),
+        storage: storage,
+        clock: () => currentTime,
+      );
+      await provider.newGame();
+      currentTime = currentTime.add(const Duration(seconds: 12));
+
+      expect(provider.elapsedSeconds, 12);
+      provider.swipe(Game2048Direction.left);
+      await provider.completeAnimation();
+      expect(storage.activeSnapshot!.elapsedSeconds, 12);
+
+      currentTime = currentTime.add(const Duration(seconds: 5));
+      expect(await provider.undo(), isTrue);
+      expect(provider.elapsedSeconds, 12);
+      currentTime = currentTime.add(const Duration(seconds: 5));
+      expect(provider.elapsedSeconds, 17);
+    });
+
+    test('settles into a new-game-ready state when no snapshot is available',
+        () async {
+      final provider = Game2048Provider(
+        engine: ScriptedEngine(initialTiles: const [], results: const []),
+        storage: MemoryStorage(),
+      );
+
+      expect(await provider.restore(), isFalse);
+      expect(provider.status, Game2048Status.playing);
+      expect(provider.tiles, isEmpty);
+    });
+
     test('checks game over after spawning the valid move result', () async {
       final provider = Game2048Provider(
         engine: ScriptedEngine(
