@@ -20,12 +20,12 @@ class Game2048Merge {
   final int value;
   final Game2048Position position;
 
-  const Game2048Merge({
-    required this.sourceTileIds,
+  Game2048Merge({
+    required List<int> sourceTileIds,
     required this.resultTileId,
     required this.value,
     required this.position,
-  });
+  }) : sourceTileIds = List.unmodifiable(sourceTileIds);
 }
 
 class Game2048MoveResult {
@@ -37,13 +37,15 @@ class Game2048MoveResult {
   final bool isGameOver;
   final int highestTile;
 
-  const Game2048MoveResult({
-    required this.tiles,
-    required this.transitions,
-    required this.merges,
+  Game2048MoveResult({
+    required List<Game2048Tile> tiles,
+    required List<Game2048Transition> transitions,
+    required List<Game2048Merge> merges,
     required this.scoreGained,
     required this.didMove,
     required this.isGameOver,
     required this.highestTile,
-  });
+  })  : tiles = List.unmodifiable(tiles),
+        transitions = List.unmodifiable(transitions),
+        merges = List.unmodifiable(merges);
 }
