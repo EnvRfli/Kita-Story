@@ -17,10 +17,11 @@ ALTER TABLE game_achievements ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own game achievements"
 ON game_achievements FOR SELECT USING (auth.uid() = user_id);
 
-CREATE OR REPLACE FUNCTION public.claim_2048_milestone(
-  p_milestone INTEGER,
-  p_points INTEGER
-)
+-- Remove the insecure legacy overload if an earlier version of this migration
+-- was applied during development. Reward values must never come from clients.
+DROP FUNCTION IF EXISTS public.claim_2048_milestone(INTEGER, INTEGER);
+
+CREATE OR REPLACE FUNCTION public.claim_2048_milestone(p_milestone INTEGER)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -29,13 +30,28 @@ AS $$
 DECLARE
   v_user_id UUID := auth.uid();
   v_achievement_id UUID;
+  v_points INTEGER;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required';
   END IF;
 
-  IF p_milestone <= 0 OR p_points < 0 THEN
-    RAISE EXCEPTION 'Invalid 2048 milestone reward';
+  v_points := CASE p_milestone
+    WHEN 128 THEN 2
+    WHEN 256 THEN 3
+    WHEN 512 THEN 5
+    WHEN 1024 THEN 10
+    WHEN 2048 THEN 20
+    WHEN 4096 THEN 30
+    ELSE CASE
+      WHEN p_milestone >= 8192
+        AND (p_milestone & (p_milestone - 1)) = 0 THEN 50
+      ELSE NULL
+    END
+  END;
+
+  IF v_points IS NULL THEN
+    RAISE EXCEPTION 'Invalid 2048 milestone: %', p_milestone;
   END IF;
 
   INSERT INTO game_achievements (
@@ -48,7 +64,7 @@ BEGIN
     v_user_id,
     '2048',
     p_milestone,
-    p_points
+    v_points
   )
   ON CONFLICT (user_id, game_type, milestone) DO NOTHING
   RETURNING id INTO v_achievement_id;
@@ -58,7 +74,7 @@ BEGIN
   END IF;
 
   UPDATE app_users
-  SET points = COALESCE(points, 0) + p_points
+  SET points = COALESCE(points, 0) + v_points
   WHERE id = v_user_id;
 
   INSERT INTO user_point_logs (
@@ -75,7 +91,7 @@ BEGIN
     'game_2048_milestone',
     'Milestone 2048 tercapai',
     format('Mencapai ubin %s di permainan 2048', p_milestone),
-    p_points,
+    v_points,
     v_achievement_id,
     now()
   );
@@ -84,5 +100,5 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.claim_2048_milestone(INTEGER, INTEGER) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.claim_2048_milestone(INTEGER, INTEGER) TO authenticated;
+REVOKE ALL ON FUNCTION public.claim_2048_milestone(INTEGER) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.claim_2048_milestone(INTEGER) TO authenticated;

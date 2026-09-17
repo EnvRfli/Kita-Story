@@ -190,24 +190,39 @@ class Game2048Repository {
   Future<Set<int>> claimMilestones(Set<int> candidates) async {
     final claimed = <int>{};
     for (final milestone in candidates.toList()..sort()) {
-      final points = milestonePoints[milestone];
-      if (points == null) continue;
+      if (rewardPointsFor(milestone) == null) continue;
       final response = await _client.rpc(
         'claim_2048_milestone',
-        params: {
-          'p_milestone': milestone,
-          'p_points': points,
-        },
+        params: buildMilestoneClaimParams(milestone),
       );
       if (response == true) claimed.add(milestone);
     }
     return claimed;
   }
 
-  static Set<int> milestoneCandidatesFor(int highestTile) => {
-        for (final milestone in milestonePoints.keys)
-          if (milestone <= highestTile) milestone,
-      };
+  Map<String, Object> buildMilestoneClaimParams(int milestone) {
+    if (rewardPointsFor(milestone) == null) {
+      throw ArgumentError.value(milestone, 'milestone', 'is not claimable');
+    }
+    return {'p_milestone': milestone};
+  }
+
+  static int? rewardPointsFor(int milestone) {
+    final configuredReward = milestonePoints[milestone];
+    if (configuredReward != null) return configuredReward;
+    if (milestone >= 8192 && (milestone & (milestone - 1)) == 0) return 50;
+    return null;
+  }
+
+  static Set<int> milestoneCandidatesFor(int highestTile) {
+    final candidates = <int>{};
+    for (var milestone = 128; milestone <= highestTile;) {
+      if (rewardPointsFor(milestone) != null) candidates.add(milestone);
+      if (milestone > highestTile ~/ 2) break;
+      milestone *= 2;
+    }
+    return candidates;
+  }
 
   static List<Game2048LeaderboardEntry> sortLeaderboard(
     Iterable<Game2048LeaderboardEntry> entries,

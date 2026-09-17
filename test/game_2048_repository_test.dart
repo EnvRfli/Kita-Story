@@ -106,5 +106,20 @@ void main() {
         {128, 256, 512, 1024, 2048},
       );
     });
+
+    test('sends no caller-controlled reward and supports later doublings', () {
+      final repository = Game2048Repository();
+
+      expect(
+        repository.buildMilestoneClaimParams(32768),
+        {'p_milestone': 32768},
+      );
+      expect(
+        Game2048Repository.milestoneCandidatesFor(32768),
+        {128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768},
+      );
+      expect(Game2048Repository.rewardPointsFor(32768), 50);
+      expect(Game2048Repository.rewardPointsFor(300), isNull);
+    });
   });
 }
