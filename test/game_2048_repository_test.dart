@@ -1,0 +1,110 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kita_story/features/games/game_2048/repositories/game_2048_repository.dart';
+
+void main() {
+  group('Game2048Repository', () {
+    test('builds the completed game-history payload with all 2048 fields', () {
+      final repository = Game2048Repository();
+
+      expect(
+        repository.buildResultPayload(
+          userId: 'me',
+          partnerId: 'partner',
+          score: 11248,
+          highestTile: 2048,
+          movesCount: 420,
+          durationSeconds: 900,
+        ),
+        {
+          'game_type': '2048',
+          'difficulty': null,
+          'user_id': 'me',
+          'partner_id': 'partner',
+          'duration_seconds': 900,
+          'score': 11248,
+          'highest_tile': 2048,
+          'moves_count': 420,
+          'status': 'completed',
+        },
+      );
+    });
+
+    test('ranks tied scores by tile, moves, duration, then completion time',
+        () {
+      final entries = [
+        Game2048LeaderboardEntry(
+          userId: 'later',
+          userName: 'Later',
+          score: 5000,
+          highestTile: 2048,
+          movesCount: 300,
+          durationSeconds: 600,
+          completedAt: DateTime.utc(2026, 9, 17, 12, 4),
+        ),
+        Game2048LeaderboardEntry(
+          userId: 'shorter',
+          userName: 'Shorter',
+          score: 5000,
+          highestTile: 2048,
+          movesCount: 300,
+          durationSeconds: 580,
+          completedAt: DateTime.utc(2026, 9, 17, 12, 5),
+        ),
+        Game2048LeaderboardEntry(
+          userId: 'fewer-moves',
+          userName: 'Fewer moves',
+          score: 5000,
+          highestTile: 2048,
+          movesCount: 280,
+          durationSeconds: 700,
+          completedAt: DateTime.utc(2026, 9, 17, 12, 6),
+        ),
+        Game2048LeaderboardEntry(
+          userId: 'higher-tile',
+          userName: 'Higher tile',
+          score: 5000,
+          highestTile: 4096,
+          movesCount: 900,
+          durationSeconds: 1200,
+          completedAt: DateTime.utc(2026, 9, 17, 12, 7),
+        ),
+        Game2048LeaderboardEntry(
+          userId: 'earlier',
+          userName: 'Earlier',
+          score: 5000,
+          highestTile: 2048,
+          movesCount: 300,
+          durationSeconds: 600,
+          completedAt: DateTime.utc(2026, 9, 17, 12, 3),
+        ),
+      ];
+
+      final ranked = Game2048Repository.sortLeaderboard(entries);
+
+      expect(
+        ranked.map((entry) => entry.userId),
+        ['higher-tile', 'fewer-moves', 'shorter', 'earlier', 'later'],
+      );
+    });
+
+    test('derives each eligible milestone reward from the highest tile', () {
+      expect(
+        Game2048Repository.milestonePoints,
+        const {
+          128: 2,
+          256: 3,
+          512: 5,
+          1024: 10,
+          2048: 20,
+          4096: 30,
+          8192: 50,
+          16384: 50,
+        },
+      );
+      expect(
+        Game2048Repository.milestoneCandidatesFor(2048),
+        {128, 256, 512, 1024, 2048},
+      );
+    });
+  });
+}
