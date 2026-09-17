@@ -8,7 +8,10 @@ import 'package:kita_story/features/games/game_2048/providers/game_2048_provider
 import 'package:kita_story/features/games/game_2048/repositories/game_2048_repository.dart';
 import 'package:kita_story/features/games/game_2048/services/game_2048_local_storage.dart';
 import 'package:kita_story/features/games/game_2048/ui/game_2048_screen.dart';
+import 'package:kita_story/features/games/game_2048/ui/game_2048_start_screen.dart';
+import 'package:kita_story/features/games/game_2048/utils/game_2048_formatters.dart';
 import 'package:kita_story/features/games/game_2048/widgets/game_2048_board.dart';
+import 'package:kita_story/features/games/game_2048/widgets/game_2048_history_bottom_sheet.dart';
 import 'package:kita_story/features/games/game_2048/widgets/game_2048_tile_widget.dart';
 import 'package:provider/provider.dart';
 
@@ -100,6 +103,13 @@ class _WidgetScriptedEngine extends Game2048Engine {
 }
 
 class _WidgetRepository extends Game2048Repository {
+  _WidgetRepository({this.leaderboard = const []});
+
+  final List<Game2048LeaderboardEntry> leaderboard;
+
+  @override
+  Future<List<Game2048LeaderboardEntry>> fetchLeaderboard() async =>
+      leaderboard;
   @override
   Future<Set<int>> claimMilestones(Set<int> candidates) async => candidates;
 
@@ -153,7 +163,170 @@ Widget _screenHarness(Game2048Provider provider) => MaterialApp(
       ),
     );
 
+Widget _startHarness({
+  required _WidgetMemoryStorage storage,
+  required _WidgetRepository repository,
+}) =>
+    MaterialApp(
+      home: Game2048StartScreen(
+        storage: storage,
+        repository: repository,
+        currentUserId: 'me',
+        engineFactory: Game2048Engine.new,
+      ),
+    );
+
+Game2048Snapshot _activeSnapshot() => Game2048Snapshot(
+      schemaVersion: Game2048Snapshot.currentSchemaVersion,
+      tiles: _tiles,
+      score: 64,
+      bestScore: 128,
+      undoSnapshots: const [],
+      undosLeft: 3,
+      moveCount: 5,
+      elapsedSeconds: 30,
+      hasCelebrated2048: false,
+      highestMilestone: 0,
+      startedAt: DateTime.utc(2026, 9, 17),
+    );
+
+Game2048LeaderboardEntry _leaderboardEntry({
+  required String userId,
+  required int score,
+  required int tile,
+  required int moves,
+  required int duration,
+  required DateTime completedAt,
+  String? name,
+}) =>
+    Game2048LeaderboardEntry(
+      userId: userId,
+      userName: name,
+      score: score,
+      highestTile: tile,
+      movesCount: moves,
+      durationSeconds: duration,
+      completedAt: completedAt,
+    );
+
 void main() {
+  test('formats 2048 scores with Indonesian separators', () {
+    expect(format2048Score(11248), '11.248');
+  });
+
+  test('2048 leaderboard applies deterministic tie breakers', () {
+    final date = DateTime.utc(2026, 9, 17);
+    final sorted = Game2048Repository.sortLeaderboard([
+      _leaderboardEntry(
+        userId: 'last',
+        score: 100,
+        tile: 128,
+        moves: 10,
+        duration: 20,
+        completedAt: date.add(const Duration(days: 1)),
+      ),
+      _leaderboardEntry(
+        userId: 'winner',
+        score: 100,
+        tile: 128,
+        moves: 10,
+        duration: 20,
+        completedAt: date,
+      ),
+      _leaderboardEntry(
+        userId: 'slow',
+        score: 100,
+        tile: 128,
+        moves: 10,
+        duration: 21,
+        completedAt: date,
+      ),
+      _leaderboardEntry(
+        userId: 'moves',
+        score: 100,
+        tile: 128,
+        moves: 11,
+        duration: 1,
+        completedAt: date,
+      ),
+      _leaderboardEntry(
+        userId: 'tile',
+        score: 100,
+        tile: 64,
+        moves: 1,
+        duration: 1,
+        completedAt: date,
+      ),
+    ]);
+
+    expect(sorted.map((entry) => entry.userId), [
+      'winner',
+      'last',
+      'slow',
+      'moves',
+      'tile',
+    ]);
+  });
+
+  testWidgets('history sheet labels the current user as Kamu', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Game2048HistoryBottomSheet(
+        entries: [
+          _leaderboardEntry(
+            userId: 'me',
+            name: 'Alya',
+            score: 128,
+            tile: 32,
+            moves: 8,
+            duration: 30,
+            completedAt: DateTime.utc(2026, 9, 17),
+          )
+        ],
+        currentUserId: 'me',
+      ),
+    ));
+
+    expect(find.text('Alya (Kamu)'), findsWidgets);
+  });
+
+  testWidgets('2048 start screen shows one Mulai action without a snapshot',
+      (tester) async {
+    await tester.pumpWidget(_startHarness(
+      storage: _WidgetMemoryStorage(),
+      repository: _WidgetRepository(leaderboard: const []),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mulai'), findsOneWidget);
+    expect(find.text('Lanjutkan'), findsNothing);
+  });
+
+  testWidgets('2048 start screen confirms replacement of an active snapshot',
+      (tester) async {
+    final assetImages = find.byWidgetPredicate(
+      (widget) =>
+          widget is Image &&
+          widget.image is AssetImage &&
+          (widget.image as AssetImage).assetName ==
+              'lib/assets/game screen/Frame 1984078794 (1).png',
+    );
+    await tester.pumpWidget(_startHarness(
+      storage: _WidgetMemoryStorage()..activeSnapshot = _activeSnapshot(),
+      repository: _WidgetRepository(),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lanjutkan'), findsOneWidget);
+    expect(find.text('Mulai Baru'), findsOneWidget);
+    expect(find.text('Hingga +120 poin'), findsOneWidget);
+    expect(assetImages, findsNWidgets(2));
+
+    await tester.tap(find.text('Mulai Baru'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mulai permainan baru?'), findsOneWidget);
+    expect(find.text('Simpanannya akan diganti.'), findsOneWidget);
+  });
+
   testWidgets('renders all cells and keeps tile keys at 320 pixels', (
     WidgetTester tester,
   ) async {
