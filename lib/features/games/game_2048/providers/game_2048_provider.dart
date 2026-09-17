@@ -6,6 +6,7 @@ import '../engine/game_2048_engine.dart';
 import '../models/game_2048_move.dart';
 import '../models/game_2048_snapshot.dart';
 import '../models/game_2048_tile.dart';
+import '../repositories/game_2048_repository.dart';
 import '../services/game_2048_local_storage.dart';
 
 enum Game2048Status {
@@ -17,20 +18,38 @@ enum Game2048Status {
   error,
 }
 
+class _PendingGame2048ResultWrite {
+  _PendingGame2048ResultWrite({
+    required this.score,
+    required this.highestTile,
+    required this.movesCount,
+    required this.durationSeconds,
+  });
+
+  final int score;
+  final int highestTile;
+  final int movesCount;
+  final int durationSeconds;
+  bool resultConfirmed = false;
+}
+
 class Game2048Provider extends ChangeNotifier {
   Game2048Provider({
     required Game2048Engine engine,
     required Game2048LocalStorage storage,
+    required Game2048Repository repository,
     this.animationDuration = const Duration(milliseconds: 170),
     DateTime Function()? clock,
   })  : _engine = engine,
         _storage = storage,
+        _repository = repository,
         _clock = clock ?? DateTime.now;
 
   static const int _initialUndos = 3;
 
   final Game2048Engine _engine;
   final Game2048LocalStorage _storage;
+  final Game2048Repository _repository;
   final DateTime Function() _clock;
   final Duration animationDuration;
 
@@ -86,6 +105,11 @@ class Game2048Provider extends ChangeNotifier {
 
   bool _celebrationPending = false;
   bool _gameOverPending = false;
+  bool _isClaimingMilestones = false;
+  _PendingGame2048ResultWrite? _pendingResultWrite;
+  Future<void>? _endRunFuture;
+
+  bool get hasPendingWrite => _pendingResultWrite != null;
   bool _isElapsedRunning = false;
   late DateTime _elapsedLastResumedAt;
   late DateTime _startedAt;
@@ -204,6 +228,27 @@ class Game2048Provider extends ChangeNotifier {
     }
     if (statusAfterSave != Game2048Status.playing) _pauseElapsed();
     await _saveActive(statusAfterSave);
+    await claimPendingMilestones();
+  }
+
+  Future<void> claimPendingMilestones() async {
+    if (_isInputLocked ||
+        _isClaimingMilestones ||
+        _pendingMilestoneSet.isEmpty) {
+      return;
+    }
+
+    _isClaimingMilestones = true;
+    final candidates = Set<int>.of(_pendingMilestoneSet);
+    try {
+      final claimed = await _repository.claimMilestones(candidates);
+      _pendingMilestoneSet.removeAll(claimed);
+    } on Object {
+      // Keep every candidate pending for a later retry.
+    } finally {
+      _isClaimingMilestones = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> undo() async {
@@ -242,12 +287,62 @@ class Game2048Provider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> saveAndExit() => _saveActive(_status);
+
+  Future<void> endRun() {
+    final existing = _endRunFuture;
+    if (existing != null) return existing;
+
+    final pending = _beginEndRun();
+    _endRunFuture = pending;
+    return pending;
+  }
+
+  Future<void> retryPendingWrites() async {
+    await claimPendingMilestones();
+    if (_pendingResultWrite != null) await _flushPendingResultWrite();
+  }
+
   Future<void> finishRun() async {
+    await endRun();
+  }
+
+  Future<void> _beginEndRun() async {
     _pauseElapsed();
+    _pendingResultWrite ??= _PendingGame2048ResultWrite(
+      score: _score,
+      highestTile: _highestTile,
+      movesCount: _moveCount,
+      durationSeconds: elapsedSeconds,
+    );
+    try {
+      await _storage.save(_snapshot(includeUndoHistory: true));
+    } on Object {
+      _status = Game2048Status.error;
+      notifyListeners();
+      return;
+    }
+    await retryPendingWrites();
+  }
+
+  Future<void> _flushPendingResultWrite() async {
+    final pending = _pendingResultWrite;
+    if (pending == null) return;
+
     _status = Game2048Status.saving;
     notifyListeners();
     try {
+      if (!pending.resultConfirmed) {
+        await _repository.saveResult(
+          score: pending.score,
+          highestTile: pending.highestTile,
+          movesCount: pending.movesCount,
+          durationSeconds: pending.durationSeconds,
+        );
+        pending.resultConfirmed = true;
+      }
       await _storage.clear();
+      _pendingResultWrite = null;
       _status = Game2048Status.gameOver;
     } on Object {
       _status = Game2048Status.error;

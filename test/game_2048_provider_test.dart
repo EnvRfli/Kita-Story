@@ -4,6 +4,7 @@ import 'package:kita_story/features/games/game_2048/models/game_2048_move.dart';
 import 'package:kita_story/features/games/game_2048/models/game_2048_snapshot.dart';
 import 'package:kita_story/features/games/game_2048/models/game_2048_tile.dart';
 import 'package:kita_story/features/games/game_2048/providers/game_2048_provider.dart';
+import 'package:kita_story/features/games/game_2048/repositories/game_2048_repository.dart';
 import 'package:kita_story/features/games/game_2048/services/game_2048_local_storage.dart';
 
 Game2048Tile tile(int id, int value) => Game2048Tile(
@@ -64,6 +65,7 @@ class MemoryStorage extends Game2048LocalStorage {
   Game2048Snapshot? activeSnapshot;
   int bestScore = 0;
   var saveCount = 0;
+  var failNextClear = false;
 
   @override
   Future<Game2048Snapshot?> load() async => activeSnapshot;
@@ -76,6 +78,10 @@ class MemoryStorage extends Game2048LocalStorage {
 
   @override
   Future<void> clear() async {
+    if (failNextClear) {
+      failNextClear = false;
+      throw StateError('Snapshot clear failed.');
+    }
     activeSnapshot = null;
   }
 
@@ -88,8 +94,215 @@ class MemoryStorage extends Game2048LocalStorage {
   }
 }
 
+class RecordingRepository extends Game2048Repository {
+  RecordingRepository({
+    List<Set<int>> claimResponses = const [],
+    List<bool> saveOutcomes = const [],
+  })  : _claimResponses = List.of(claimResponses),
+        _saveOutcomes = List.of(saveOutcomes);
+
+  final List<Set<int>> _claimResponses;
+  final List<bool> _saveOutcomes;
+  final List<Set<int>> claimCalls = [];
+  final List<
+      ({
+        int score,
+        int highestTile,
+        int movesCount,
+        int durationSeconds,
+      })> saveCalls = [];
+
+  @override
+  Future<Set<int>> claimMilestones(Set<int> candidates) async {
+    claimCalls.add(Set.of(candidates));
+    if (_claimResponses.isEmpty) return const {};
+    return _claimResponses.removeAt(0);
+  }
+
+  @override
+  Future<Game2048Result> saveResult({
+    required int score,
+    required int highestTile,
+    required int movesCount,
+    required int durationSeconds,
+  }) async {
+    saveCalls.add((
+      score: score,
+      highestTile: highestTile,
+      movesCount: movesCount,
+      durationSeconds: durationSeconds,
+    ));
+    if (_saveOutcomes.isNotEmpty && !_saveOutcomes.removeAt(0)) {
+      throw StateError('Result write failed.');
+    }
+    return Game2048Result(
+      id: 'result',
+      userId: 'user',
+      partnerId: null,
+      score: score,
+      highestTile: highestTile,
+      movesCount: movesCount,
+      durationSeconds: durationSeconds,
+      completedAt: DateTime.utc(2026, 9, 17),
+    );
+  }
+}
+
 void main() {
   group('Game2048Provider', () {
+    test('retries only unresolved milestone claims', () async {
+      final repository = RecordingRepository(
+        claimResponses: [
+          {128, 512},
+          {256, 1024, 2048},
+        ],
+      );
+      final provider = Game2048Provider(
+        engine: ScriptedEngine(
+          initialTiles: [tile(1, 1024), tile(2, 1024)],
+          results: [
+            result(tiles: [tile(3, 2048)], scoreGained: 2048)
+          ],
+        ),
+        storage: MemoryStorage(),
+        repository: repository,
+      );
+
+      await provider.newGame();
+      provider.swipe(Game2048Direction.left);
+
+      expect(repository.claimCalls, isEmpty);
+
+      await provider.completeAnimation();
+
+      expect(repository.claimCalls, [
+        {128, 256, 512, 1024, 2048},
+      ]);
+      expect(provider.pendingMilestones, [256, 1024, 2048]);
+
+      await provider.claimPendingMilestones();
+
+      expect(repository.claimCalls, [
+        {128, 256, 512, 1024, 2048},
+        {256, 1024, 2048},
+      ]);
+      expect(provider.pendingMilestones, isEmpty);
+    });
+
+    test('save and exit only persists the active game locally', () async {
+      final storage = MemoryStorage();
+      final repository = RecordingRepository();
+      final provider = Game2048Provider(
+        engine: ScriptedEngine(
+          initialTiles: [tile(1, 2), tile(2, 2)],
+          results: const [],
+        ),
+        storage: storage,
+        repository: repository,
+      );
+
+      await provider.newGame();
+      await provider.saveAndExit();
+
+      expect(storage.activeSnapshot, isNotNull);
+      expect(repository.saveCalls, isEmpty);
+      expect(provider.status, Game2048Status.playing);
+    });
+
+    test('end run writes one result and clears the active snapshot', () async {
+      var currentTime = DateTime.utc(2026, 9, 17, 12);
+      final storage = MemoryStorage();
+      final repository = RecordingRepository();
+      final provider = Game2048Provider(
+        engine: ScriptedEngine(
+          initialTiles: [tile(1, 2), tile(2, 2)],
+          results: [
+            result(tiles: [tile(3, 4)], scoreGained: 4)
+          ],
+        ),
+        storage: storage,
+        repository: repository,
+        clock: () => currentTime,
+      );
+
+      await provider.newGame();
+      currentTime = currentTime.add(const Duration(seconds: 12));
+      provider.swipe(Game2048Direction.left);
+      await provider.completeAnimation();
+
+      await Future.wait([provider.endRun(), provider.endRun()]);
+
+      expect(repository.saveCalls, [
+        (
+          score: 4,
+          highestTile: 4,
+          movesCount: 1,
+          durationSeconds: 12,
+        ),
+      ]);
+      expect(storage.activeSnapshot, isNull);
+      expect(provider.status, Game2048Status.gameOver);
+    });
+
+    test('retains a pending result and active snapshot until a retry succeeds',
+        () async {
+      final storage = MemoryStorage();
+      final repository = RecordingRepository(saveOutcomes: [false, true]);
+      final provider = Game2048Provider(
+        engine: ScriptedEngine(
+          initialTiles: [tile(1, 2), tile(2, 2)],
+          results: const [],
+        ),
+        storage: storage,
+        repository: repository,
+      );
+
+      await provider.newGame();
+      await provider.saveAndExit();
+      await provider.endRun();
+
+      expect(repository.saveCalls, hasLength(1));
+      expect(storage.activeSnapshot, isNotNull);
+      expect(provider.hasPendingWrite, isTrue);
+      expect(provider.status, Game2048Status.error);
+
+      await provider.retryPendingWrites();
+
+      expect(repository.saveCalls, hasLength(2));
+      expect(storage.activeSnapshot, isNull);
+      expect(provider.hasPendingWrite, isFalse);
+      expect(provider.status, Game2048Status.gameOver);
+    });
+
+    test(
+        'does not save a confirmed result again when clearing local state fails',
+        () async {
+      final storage = MemoryStorage()..failNextClear = true;
+      final repository = RecordingRepository();
+      final provider = Game2048Provider(
+        engine: ScriptedEngine(
+          initialTiles: [tile(1, 2), tile(2, 2)],
+          results: const [],
+        ),
+        storage: storage,
+        repository: repository,
+      );
+
+      await provider.newGame();
+      await provider.saveAndExit();
+      await provider.endRun();
+
+      expect(repository.saveCalls, hasLength(1));
+      expect(storage.activeSnapshot, isNotNull);
+      expect(provider.hasPendingWrite, isTrue);
+
+      await provider.retryPendingWrites();
+
+      expect(repository.saveCalls, hasLength(1));
+      expect(storage.activeSnapshot, isNull);
+      expect(provider.hasPendingWrite, isFalse);
+    });
+
     test('starts a new run and locks valid input until animation completes',
         () async {
       final storage = MemoryStorage();
@@ -101,6 +314,7 @@ void main() {
           ],
         ),
         storage: storage,
+        repository: RecordingRepository(),
       );
 
       await provider.newGame();
@@ -138,6 +352,7 @@ void main() {
           ],
         ),
         storage: MemoryStorage(),
+        repository: RecordingRepository(),
       );
       await provider.newGame();
       for (var index = 0; index < 4; index++) {
@@ -176,6 +391,7 @@ void main() {
           ],
         ),
         storage: storage,
+        repository: RecordingRepository(),
       );
       await provider.newGame();
 
@@ -201,6 +417,7 @@ void main() {
           ],
         ),
         storage: MemoryStorage(),
+        repository: RecordingRepository(),
       );
       await provider.newGame();
 
@@ -232,6 +449,7 @@ void main() {
           hasAvailableMoves: false,
         ),
         storage: MemoryStorage(),
+        repository: RecordingRepository(),
       );
       await provider.newGame();
 
@@ -256,6 +474,7 @@ void main() {
           ],
         ),
         storage: storage,
+        repository: RecordingRepository(),
         clock: () => currentTime,
       );
       await provider.newGame();
@@ -278,6 +497,7 @@ void main() {
       final provider = Game2048Provider(
         engine: ScriptedEngine(initialTiles: const [], results: const []),
         storage: MemoryStorage(),
+        repository: RecordingRepository(),
       );
 
       expect(await provider.restore(), isFalse);
@@ -299,6 +519,7 @@ void main() {
           hasAvailableMoves: false,
         ),
         storage: MemoryStorage(),
+        repository: RecordingRepository(),
       );
       await provider.newGame();
 
