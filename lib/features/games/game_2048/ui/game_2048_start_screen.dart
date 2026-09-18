@@ -94,6 +94,7 @@ class _Game2048StartScreenState extends State<Game2048StartScreen> {
   }
 
   Future<void> _startNew() async {
+    if (_snapshot?.pendingFinalization != null) return;
     if (_snapshot != null) {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -115,6 +116,21 @@ class _Game2048StartScreenState extends State<Game2048StartScreen> {
       if (confirmed != true || !mounted) return;
     }
     await _openGame(restore: false);
+  }
+
+  Future<void> _retryFinalization() async {
+    if (_openingGame || _snapshot?.pendingFinalization == null) return;
+    setState(() => _openingGame = true);
+    final provider = Game2048Provider(
+      engine: widget.engineFactory(),
+      storage: _storage,
+      repository: _repository,
+    );
+    await provider.restore();
+    provider.dispose();
+    if (!mounted) return;
+    setState(() => _openingGame = false);
+    await _refresh();
   }
 
   Future<void> _openGame({required bool restore}) async {
@@ -168,6 +184,8 @@ class _Game2048StartScreenState extends State<Game2048StartScreen> {
                           isOpening: _openingGame,
                           onContinue: () => unawaited(_openGame(restore: true)),
                           onNewGame: () => unawaited(_startNew()),
+                          onRetryFinalization: () =>
+                              unawaited(_retryFinalization()),
                         ),
                         const SizedBox(height: 18),
                         _LeaderboardPreview(
@@ -297,6 +315,7 @@ class _ResumeSection extends StatelessWidget {
     required this.isOpening,
     required this.onContinue,
     required this.onNewGame,
+    required this.onRetryFinalization,
   });
   final bool isLoading;
   final Game2048Snapshot? snapshot;
@@ -304,6 +323,7 @@ class _ResumeSection extends StatelessWidget {
   final bool isOpening;
   final VoidCallback onContinue;
   final VoidCallback onNewGame;
+  final VoidCallback onRetryFinalization;
 
   @override
   Widget build(BuildContext context) {
@@ -316,6 +336,12 @@ class _ResumeSection extends StatelessWidget {
         icon: Icons.cloud_off_rounded,
         title: 'Permainan tersimpan belum bisa dimuat',
         subtitle: 'Kamu tetap bisa memulai permainan baru.',
+      );
+    }
+    if (snapshot?.pendingFinalization != null) {
+      return _PendingFinalizationState(
+        isSaving: isOpening,
+        onRetry: onRetryFinalization,
       );
     }
     final hasSnapshot = snapshot != null;
@@ -365,6 +391,68 @@ class _ResumeSection extends StatelessWidget {
       ],
     ]);
   }
+}
+
+class _PendingFinalizationState extends StatelessWidget {
+  const _PendingFinalizationState({
+    required this.isSaving,
+    required this.onRetry,
+  });
+
+  final bool isSaving;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF8EB),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFFFD89B)),
+        ),
+        child: Column(children: [
+          const Icon(Icons.cloud_upload_rounded,
+              color: Color(0xFFE58A00), size: 30),
+          const SizedBox(height: 9),
+          const Text(
+            'Hasil permainan belum tersimpan',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'Simpan hasil ini lebih dulu sebelum memulai permainan baru.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+          ),
+          const SizedBox(height: 13),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: isSaving ? null : onRetry,
+              icon: isSaving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              label: Text(isSaving ? 'Menyimpan...' : 'Coba Simpan Lagi'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE58A00),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ]),
+      );
 }
 
 class _LeaderboardPreview extends StatelessWidget {

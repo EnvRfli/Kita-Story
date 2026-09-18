@@ -232,6 +232,27 @@ Game2048Snapshot _activeSnapshot() => Game2048Snapshot(
       startedAt: DateTime.utc(2026, 9, 17),
     );
 
+Game2048Snapshot _pendingFinalizationSnapshot() => Game2048Snapshot(
+      schemaVersion: Game2048Snapshot.currentSchemaVersion,
+      tiles: _tiles,
+      score: 512,
+      bestScore: 512,
+      undoSnapshots: const [],
+      undosLeft: 1,
+      moveCount: 24,
+      elapsedSeconds: 90,
+      hasCelebrated2048: false,
+      highestMilestone: 256,
+      startedAt: DateTime.utc(2026, 9, 17),
+      pendingFinalization: const Game2048PendingFinalization(
+        score: 512,
+        highestTile: 256,
+        movesCount: 24,
+        durationSeconds: 90,
+        resultConfirmed: false,
+      ),
+    );
+
 Game2048Snapshot _terminalSnapshot() => Game2048Snapshot(
       schemaVersion: Game2048Snapshot.currentSchemaVersion,
       tiles: [
@@ -409,6 +430,43 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Mulai permainan baru?'), findsOneWidget);
     expect(find.text('Simpanannya akan diganti.'), findsOneWidget);
+  });
+
+  testWidgets(
+      'pending finalization blocks resume and replacement with an explicit retry',
+      (tester) async {
+    await tester.pumpWidget(_startHarness(
+      storage: _WidgetMemoryStorage()
+        ..activeSnapshot = _pendingFinalizationSnapshot(),
+      repository: _WidgetRepository(failResultSaves: true),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hasil permainan belum tersimpan'), findsOneWidget);
+    expect(find.text('Coba Simpan Lagi'), findsOneWidget);
+    expect(find.text('Lanjutkan'), findsNothing);
+    expect(find.text('Mulai Baru'), findsNothing);
+    expect(find.text('Mulai'), findsNothing);
+  });
+
+  testWidgets('successful pending-finalization retry unlocks a new game',
+      (tester) async {
+    final storage = _WidgetMemoryStorage()
+      ..activeSnapshot = _pendingFinalizationSnapshot();
+    final repository = _WidgetRepository();
+    await tester.pumpWidget(_startHarness(
+      storage: storage,
+      repository: repository,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Coba Simpan Lagi'));
+    await tester.pumpAndSettle();
+
+    expect(repository.saveCount, 1);
+    expect(storage.activeSnapshot, isNull);
+    expect(find.text('Mulai'), findsOneWidget);
+    expect(find.text('Mulai Baru'), findsNothing);
   });
 
   testWidgets('renders all cells and keeps tile keys at 320 pixels', (
