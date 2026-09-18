@@ -17,15 +17,15 @@ class Game2048Screen extends StatefulWidget {
 
 class _Game2048ScreenState extends State<Game2048Screen> {
   var _isLeaving = false;
+  var _isExitActionPending = false;
 
   @override
   Widget build(BuildContext context) => Consumer<Game2048Provider>(
         builder: (context, provider, _) {
-          final hasActiveRun = provider.status != Game2048Status.gameOver;
           return PopScope(
-            canPop: _isLeaving || !hasActiveRun,
+            canPop: _isLeaving,
             onPopInvokedWithResult: (didPop, _) {
-              if (!didPop && hasActiveRun) _showExitDialog(context, provider);
+              if (!didPop) _handleBackRequest(context, provider);
             },
             child: Scaffold(
               backgroundColor: const Color(0xFFFCFCFD),
@@ -34,7 +34,7 @@ class _Game2048ScreenState extends State<Game2048Screen> {
                   children: [
                     _GameContents(
                       provider: provider,
-                      onExit: () => _showExitDialog(context, provider),
+                      onExit: () => _handleBackRequest(context, provider),
                     ),
                     if (provider.status == Game2048Status.celebrating2048)
                       Game2048CelebrationOverlay(
@@ -48,8 +48,12 @@ class _Game2048ScreenState extends State<Game2048Screen> {
                         highestTile: provider.highestTile,
                         isNewRecord: provider.score > 0 &&
                             provider.score >= provider.bestScore,
-                        onPlayAgain: () => unawaited(_playAgain(provider)),
-                        onBack: () => _finishAndExit(context, provider),
+                        onPlayAgain: _isExitActionPending
+                            ? null
+                            : () => unawaited(_playAgain(provider)),
+                        onBack: _isExitActionPending
+                            ? null
+                            : () => _finishAndExit(context, provider),
                       ),
                   ],
                 ),
@@ -59,48 +63,95 @@ class _Game2048ScreenState extends State<Game2048Screen> {
         },
       );
 
+  void _handleBackRequest(
+    BuildContext context,
+    Game2048Provider provider,
+  ) {
+    if (_exitIsBlocked(provider)) return;
+    if (provider.status == Game2048Status.gameOver) {
+      unawaited(_finishAndExit(context, provider));
+      return;
+    }
+    unawaited(_showExitDialog(context, provider));
+  }
+
+  bool _exitIsBlocked(Game2048Provider provider) =>
+      _isExitActionPending ||
+      provider.isInputLocked ||
+      provider.status == Game2048Status.saving ||
+      provider.status == Game2048Status.loading;
+
   Future<void> _showExitDialog(
     BuildContext screenContext,
     Game2048Provider provider,
   ) async {
-    if (provider.status == Game2048Status.saving ||
-        provider.status == Game2048Status.loading) {
-      return;
-    }
+    if (_exitIsBlocked(provider)) return;
+    var dialogPending = false;
     await showDialog<void>(
       context: screenContext,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Keluar dari permainan?'),
-        content: const Text(
-          'Permainanmu bisa disimpan untuk dilanjutkan nanti.',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Keluar dari permainan?'),
+          content: const Text(
+            'Permainanmu bisa disimpan untuk dilanjutkan nanti.',
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: dialogPending
+                  ? null
+                  : () => Navigator.of(dialogContext).pop(),
+              child: const Text('Lanjut Bermain'),
+            ),
+            TextButton(
+              onPressed: dialogPending
+                  ? null
+                  : () async {
+                      setDialogState(() => dialogPending = true);
+                      _setExitActionPending(true);
+                      await provider.saveAndExit();
+                      if (!mounted) return;
+                      if (provider.status == Game2048Status.error) {
+                        _setExitActionPending(false);
+                        if (dialogContext.mounted) {
+                          setDialogState(() => dialogPending = false);
+                        }
+                        return;
+                      }
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop();
+                      }
+                      if (screenContext.mounted) _popScreen(screenContext);
+                    },
+              child: const Text('Simpan & Keluar'),
+            ),
+            TextButton(
+              onPressed: dialogPending
+                  ? null
+                  : () async {
+                      setDialogState(() => dialogPending = true);
+                      _setExitActionPending(true);
+                      await provider.endRun();
+                      if (!mounted) return;
+                      if (provider.status == Game2048Status.error) {
+                        _setExitActionPending(false);
+                        if (dialogContext.mounted) {
+                          setDialogState(() => dialogPending = false);
+                        }
+                        return;
+                      }
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop();
+                      }
+                      if (screenContext.mounted) _popScreen(screenContext);
+                    },
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFD64646),
+              ),
+              child: const Text('Akhiri Permainan'),
+            ),
+          ],
         ),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Lanjut Bermain'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await provider.saveAndExit();
-              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-              if (!screenContext.mounted) return;
-              _popScreen(screenContext);
-            },
-            child: const Text('Simpan & Keluar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await provider.endRun();
-              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-              if (!screenContext.mounted) return;
-              _popScreen(screenContext);
-            },
-            style:
-                TextButton.styleFrom(foregroundColor: const Color(0xFFD64646)),
-            child: const Text('Akhiri Permainan'),
-          ),
-        ],
       ),
     );
   }
@@ -109,14 +160,35 @@ class _Game2048ScreenState extends State<Game2048Screen> {
     BuildContext context,
     Game2048Provider provider,
   ) async {
+    if (_exitIsBlocked(provider)) return;
+    _setExitActionPending(true);
     await provider.endRun();
+    if (!mounted) return;
+    if (provider.status == Game2048Status.error) {
+      _setExitActionPending(false);
+      return;
+    }
     if (!context.mounted) return;
     _popScreen(context);
   }
 
   Future<void> _playAgain(Game2048Provider provider) async {
+    if (_exitIsBlocked(provider)) return;
+    _setExitActionPending(true);
     await provider.endRun();
+    if (!mounted) return;
+    if (provider.status == Game2048Status.error) {
+      _setExitActionPending(false);
+      return;
+    }
     await provider.newGame();
+    if (mounted) _setExitActionPending(false);
+  }
+
+  void _setExitActionPending(bool value) {
+    if (mounted && _isExitActionPending != value) {
+      setState(() => _isExitActionPending = value);
+    }
   }
 
   void _popScreen(BuildContext context) {

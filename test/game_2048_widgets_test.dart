@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kita_story/features/games/game_2048/engine/game_2048_engine.dart';
@@ -50,8 +52,9 @@ Widget _boardHarness({
 class _WidgetMemoryStorage extends Game2048LocalStorage {
   Game2048Snapshot? activeSnapshot;
   int bestScore;
+  Completer<void>? saveGate;
 
-  _WidgetMemoryStorage({this.bestScore = 0});
+  _WidgetMemoryStorage({this.bestScore = 0, this.saveGate});
 
   @override
   Future<void> clear() async => activeSnapshot = null;
@@ -64,6 +67,7 @@ class _WidgetMemoryStorage extends Game2048LocalStorage {
 
   @override
   Future<void> save(Game2048Snapshot snapshot) async {
+    await saveGate?.future;
     activeSnapshot = snapshot;
   }
 
@@ -103,9 +107,14 @@ class _WidgetScriptedEngine extends Game2048Engine {
 }
 
 class _WidgetRepository extends Game2048Repository {
-  _WidgetRepository({this.leaderboard = const []});
+  _WidgetRepository({
+    this.leaderboard = const [],
+    this.failResultSaves = false,
+  });
 
   final List<Game2048LeaderboardEntry> leaderboard;
+  final bool failResultSaves;
+  int saveCount = 0;
 
   @override
   Future<List<Game2048LeaderboardEntry>> fetchLeaderboard() async =>
@@ -119,17 +128,20 @@ class _WidgetRepository extends Game2048Repository {
     required int highestTile,
     required int movesCount,
     required int durationSeconds,
-  }) async =>
-      Game2048Result(
-        id: 'test-result',
-        userId: 'test-user',
-        partnerId: null,
-        score: score,
-        highestTile: highestTile,
-        movesCount: movesCount,
-        durationSeconds: durationSeconds,
-        completedAt: DateTime.utc(2026, 9, 17),
-      );
+  }) async {
+    saveCount++;
+    if (failResultSaves) throw StateError('offline');
+    return Game2048Result(
+      id: 'test-result',
+      userId: 'test-user',
+      partnerId: null,
+      score: score,
+      highestTile: highestTile,
+      movesCount: movesCount,
+      durationSeconds: durationSeconds,
+      completedAt: DateTime.utc(2026, 9, 17),
+    );
+  }
 }
 
 Game2048Tile _screenTile(int id, int value) => Game2048Tile(
@@ -156,10 +168,39 @@ Game2048MoveResult _screenResult({
       ),
     );
 
-Widget _screenHarness(Game2048Provider provider) => MaterialApp(
-      home: ChangeNotifierProvider<Game2048Provider>.value(
-        value: provider,
-        child: const Game2048Screen(),
+Widget _screenHarness(
+  Game2048Provider provider, {
+  bool disableAnimations = false,
+}) =>
+    MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(disableAnimations: disableAnimations),
+        child: ChangeNotifierProvider<Game2048Provider>.value(
+          value: provider,
+          child: const Game2048Screen(),
+        ),
+      ),
+    );
+
+Widget _navigationHarness(Game2048Provider provider) => MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: FilledButton(
+              key: const ValueKey('open-2048-screen'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      ChangeNotifierProvider<Game2048Provider>.value(
+                    value: provider,
+                    child: const Game2048Screen(),
+                  ),
+                ),
+              ),
+              child: const Text('Buka 2048'),
+            ),
+          ),
+        ),
       ),
     );
 
@@ -187,6 +228,28 @@ Game2048Snapshot _activeSnapshot() => Game2048Snapshot(
       elapsedSeconds: 30,
       hasCelebrated2048: false,
       highestMilestone: 0,
+      startedAt: DateTime.utc(2026, 9, 17),
+    );
+
+Game2048Snapshot _terminalSnapshot() => Game2048Snapshot(
+      schemaVersion: Game2048Snapshot.currentSchemaVersion,
+      tiles: [
+        for (var row = 0; row < 4; row++)
+          for (var col = 0; col < 4; col++)
+            Game2048Tile(
+              id: row * 4 + col + 1,
+              value: (row + col).isEven ? 2 : 4,
+              position: Game2048Position(row, col),
+            ),
+      ],
+      score: 512,
+      bestScore: 512,
+      undoSnapshots: const [],
+      undosLeft: 0,
+      moveCount: 60,
+      elapsedSeconds: 90,
+      hasCelebrated2048: false,
+      highestMilestone: 256,
       startedAt: DateTime.utc(2026, 9, 17),
     );
 
@@ -494,6 +557,157 @@ void main() {
     expect(provider.status, Game2048Status.gameOver);
   });
 
+  testWidgets('back controls stay blocked while gameplay is locked', (
+    WidgetTester tester,
+  ) async {
+    final provider = Game2048Provider(
+      engine: _WidgetScriptedEngine(
+        initialTiles: [_screenTile(1, 2), _screenTile(2, 2)],
+        results: [
+          _screenResult(tiles: [_screenTile(3, 4)], scoreGained: 4),
+        ],
+      ),
+      storage: _WidgetMemoryStorage(),
+      repository: _WidgetRepository(),
+      animationDuration: const Duration(days: 1),
+    );
+    await provider.newGame();
+    provider.swipe(Game2048Direction.left);
+    expect(provider.isInputLocked, isTrue);
+    await tester.pumpWidget(_screenHarness(provider));
+
+    await tester.tap(find.byKey(const ValueKey('game-2048-back-button')));
+    await tester.pump();
+    expect(find.text('Simpan & Keluar'), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.text('Simpan & Keluar'), findsNothing);
+  });
+
+  testWidgets('back controls stay blocked while loading or saving', (
+    WidgetTester tester,
+  ) async {
+    final saveGate = Completer<void>();
+    final storage = _WidgetMemoryStorage(saveGate: saveGate);
+    final provider = Game2048Provider(
+      engine: _WidgetScriptedEngine(
+        initialTiles: [_screenTile(1, 2), _screenTile(2, 4)],
+      ),
+      storage: storage,
+      repository: _WidgetRepository(),
+    );
+    await tester.pumpWidget(_screenHarness(provider));
+
+    await tester.tap(find.byKey(const ValueKey('game-2048-back-button')));
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(provider.status, Game2048Status.loading);
+    expect(find.text('Simpan & Keluar'), findsNothing);
+
+    await provider.newGame();
+    unawaited(provider.saveAndExit());
+    await tester.pump();
+    expect(provider.status, Game2048Status.saving);
+
+    await tester.tap(find.byKey(const ValueKey('game-2048-back-button')));
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.text('Simpan & Keluar'), findsNothing);
+    saveGate.complete();
+    await tester.pump();
+  });
+
+  testWidgets('exit dialog disables every action while persistence is pending',
+      (
+    WidgetTester tester,
+  ) async {
+    final saveGate = Completer<void>();
+    final provider = Game2048Provider(
+      engine: _WidgetScriptedEngine(
+        initialTiles: [_screenTile(1, 2), _screenTile(2, 4)],
+      ),
+      storage: _WidgetMemoryStorage(saveGate: saveGate),
+      repository: _WidgetRepository(),
+    );
+    await provider.newGame();
+    await tester.pumpWidget(_screenHarness(provider));
+    await tester.tap(find.byKey(const ValueKey('game-2048-back-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Simpan & Keluar'));
+    await tester.pump();
+
+    for (final label in [
+      'Lanjut Bermain',
+      'Simpan & Keluar',
+      'Akhiri Permainan',
+    ]) {
+      final button = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, label),
+      );
+      expect(button.onPressed, isNull, reason: '$label must be disabled');
+    }
+
+    saveGate.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('system back finalizes a restored terminal run before leaving', (
+    WidgetTester tester,
+  ) async {
+    final storage = _WidgetMemoryStorage()
+      ..activeSnapshot = _terminalSnapshot();
+    final repository = _WidgetRepository();
+    final provider = Game2048Provider(
+      engine: _WidgetScriptedEngine(
+        initialTiles: const [],
+        hasAvailableMoves: false,
+      ),
+      storage: storage,
+      repository: repository,
+    );
+    await provider.restore();
+    expect(provider.status, Game2048Status.gameOver);
+    await tester.pumpWidget(_navigationHarness(provider));
+    await tester.tap(find.byKey(const ValueKey('open-2048-screen')));
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(repository.saveCount, 1);
+    expect(storage.activeSnapshot, isNull);
+    expect(find.byType(Game2048Screen), findsNothing);
+  });
+
+  testWidgets('failed terminal finalization never pops the game screen', (
+    WidgetTester tester,
+  ) async {
+    final storage = _WidgetMemoryStorage()
+      ..activeSnapshot = _terminalSnapshot();
+    final repository = _WidgetRepository(failResultSaves: true);
+    final provider = Game2048Provider(
+      engine: _WidgetScriptedEngine(
+        initialTiles: const [],
+        hasAvailableMoves: false,
+      ),
+      storage: storage,
+      repository: repository,
+    );
+    await provider.restore();
+    await tester.pumpWidget(_navigationHarness(provider));
+    await tester.tap(find.byKey(const ValueKey('open-2048-screen')));
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(provider.status, Game2048Status.error);
+    expect(storage.activeSnapshot, isNotNull);
+    expect(find.byType(Game2048Screen), findsOneWidget);
+  });
+
   testWidgets('shows a playful celebration when 2048 is reached', (
     WidgetTester tester,
   ) async {
@@ -521,6 +735,38 @@ void main() {
     await tester.tap(find.text('Lanjutkan Bermain'));
     await tester.pump();
     expect(provider.status, Game2048Status.playing);
+  });
+
+  testWidgets('reduced motion settles result card and confetti animations', (
+    WidgetTester tester,
+  ) async {
+    final provider = Game2048Provider(
+      engine: _WidgetScriptedEngine(
+        initialTiles: [_screenTile(1, 1024), _screenTile(2, 1024)],
+        results: [
+          _screenResult(tiles: [_screenTile(3, 2048)], scoreGained: 2048),
+        ],
+      ),
+      storage: _WidgetMemoryStorage(),
+      repository: _WidgetRepository(),
+    );
+    await provider.newGame();
+    provider.swipe(Game2048Direction.left);
+    await provider.completeAnimation();
+    await tester.pumpWidget(
+      _screenHarness(provider, disableAnimations: true),
+    );
+
+    await tester.pumpAndSettle();
+
+    final transitions = tester.widgetList<TweenAnimationBuilder<double>>(
+      find.byType(TweenAnimationBuilder<double>),
+    );
+    expect(transitions, isNotEmpty);
+    expect(
+        transitions.every((transition) => transition.duration == Duration.zero),
+        isTrue);
+    expect(find.byKey(const ValueKey('game-2048-confetti')), findsOneWidget);
   });
 
   testWidgets('shows game-over results and remains usable at 343 by 775', (

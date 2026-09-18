@@ -111,8 +111,8 @@ class Game2048GameOverOverlay extends StatelessWidget {
   final int score;
   final int highestTile;
   final bool isNewRecord;
-  final VoidCallback onPlayAgain;
-  final VoidCallback onBack;
+  final VoidCallback? onPlayAgain;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) => _ResultScrim(
@@ -219,35 +219,39 @@ class _ResultCard extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutBack,
-        tween: Tween(begin: 0.88, end: 1),
-        builder: (context, value, child) => Transform.scale(
-          scale: value,
-          child: child,
-        ),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 340),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.white, Color(0xFFFFF9FD)],
-            ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x520E0714),
-                blurRadius: 28,
-                offset: Offset(0, 12),
-              ),
-            ],
+  Widget build(BuildContext context) {
+    final disableAnimations = MediaQuery.of(context).disableAnimations;
+    return TweenAnimationBuilder<double>(
+      duration:
+          disableAnimations ? Duration.zero : const Duration(milliseconds: 260),
+      curve: Curves.easeOutBack,
+      tween: Tween(begin: disableAnimations ? 1 : 0.88, end: 1),
+      builder: (context, value, child) => Transform.scale(
+        scale: value,
+        child: child,
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 340),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, Color(0xFFFFF9FD)],
           ),
-          child: child,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x520E0714),
+              blurRadius: 28,
+              offset: Offset(0, 12),
+            ),
+          ],
         ),
-      );
+        child: child,
+      ),
+    );
+  }
 }
 
 class _ResultMetric extends StatelessWidget {
@@ -300,7 +304,23 @@ class _CelebrationParticlesState extends State<_CelebrationParticles>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1800),
-  )..repeat();
+  );
+  bool? _disableAnimations;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final disableAnimations = MediaQuery.of(context).disableAnimations;
+    if (_disableAnimations == disableAnimations) return;
+    _disableAnimations = disableAnimations;
+    if (disableAnimations) {
+      _controller
+        ..stop()
+        ..value = .35;
+    } else {
+      _controller.repeat();
+    }
+  }
 
   @override
   void dispose() {
