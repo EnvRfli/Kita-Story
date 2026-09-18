@@ -46,3 +46,6 @@ app.*.map.json
 
 # Env
 .env
+
+# Isolated feature worktrees
+/.worktrees/
