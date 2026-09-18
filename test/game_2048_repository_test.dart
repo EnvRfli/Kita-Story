@@ -150,5 +150,37 @@ void main() {
       expect(sorted, hasLength(1));
       expect(sorted.first.userId, 'valid');
     });
+
+    test('verifies milestone rewards sum up to 120 points for standard 7 milestones', () {
+      const standardMilestones = [128, 256, 512, 1024, 2048, 4096, 8192];
+      var total = 0;
+      for (final m in standardMilestones) {
+        total += Game2048Repository.rewardPointsFor(m) ?? 0;
+      }
+      expect(total, 120);
+    });
+
+    test('fetchClaimedMilestones returns empty set safely on empty userId', () async {
+      final repository = Game2048Repository();
+      expect(await repository.fetchClaimedMilestones(''), isEmpty);
+    });
+
+    test('calculatePointsForMilestones calculates accumulated points correctly', () {
+      expect(Game2048Repository.calculatePointsForMilestones([]), 0);
+      // 128 (2) + 256 (3) = 5
+      expect(Game2048Repository.calculatePointsForMilestones([128, 256]), 5);
+      // Candidates up to 2048: 128(2) + 256(3) + 512(5) + 1024(10) + 2048(20) = 40
+      final candidates2048 = Game2048Repository.milestoneCandidatesFor(2048);
+      expect(Game2048Repository.calculatePointsForMilestones(candidates2048), 40);
+      // All 7 standard milestones = 120
+      final all7 = [128, 256, 512, 1024, 2048, 4096, 8192];
+      expect(Game2048Repository.calculatePointsForMilestones(all7), 120);
+    });
+
+    test('claimMilestones filters candidate milestones to only valid milestone tiles', () async {
+      final repository = Game2048Repository();
+      final claimed = await repository.claimMilestones({64, 128, 300, 2048});
+      expect(claimed, {128, 2048});
+    });
   });
 }

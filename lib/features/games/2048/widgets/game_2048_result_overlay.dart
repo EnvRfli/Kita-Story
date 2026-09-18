@@ -13,6 +13,7 @@ class Game2048CelebrationOverlay extends StatefulWidget {
     required this.onContinue,
     this.elapsedSeconds = 0,
     this.movesCount = 0,
+    this.pointsEarned = 20,
     this.onHome,
   });
 
@@ -20,6 +21,7 @@ class Game2048CelebrationOverlay extends StatefulWidget {
   final int tile;
   final int elapsedSeconds;
   final int movesCount;
+  final int pointsEarned;
   final VoidCallback onContinue;
   final VoidCallback? onHome;
 
@@ -237,7 +239,7 @@ class _Game2048CelebrationOverlayState extends State<Game2048CelebrationOverlay>
                             ],
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 16),
                         // Points reward badge
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -253,18 +255,18 @@ class _Game2048CelebrationOverlayState extends State<Game2048CelebrationOverlay>
                             ),
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.auto_awesome_rounded,
+                              const Icon(
+                                Icons.stars_rounded,
                                 color: Color(0xFF7047F6),
-                                size: 19,
+                                size: 20,
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Text(
-                                '+20 Poin',
-                                style: TextStyle(
+                                '+${widget.pointsEarned} Poin',
+                                style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
                                   color: Color(0xFF5B42D6),
@@ -341,6 +343,7 @@ class Game2048GameOverOverlay extends StatelessWidget {
     required this.score,
     required this.highestTile,
     this.isNewRecord = false,
+    this.pointsEarned = 0,
     required this.onPlayAgain,
     required this.onBack,
   });
@@ -348,6 +351,7 @@ class Game2048GameOverOverlay extends StatelessWidget {
   final int score;
   final int highestTile;
   final bool isNewRecord;
+  final int pointsEarned;
   final VoidCallback onPlayAgain;
   final VoidCallback onBack;
 
@@ -436,6 +440,67 @@ class Game2048GameOverOverlay extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: pointsEarned > 0
+                            ? const Color(0xFFF0FDF4)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: pointsEarned > 0
+                              ? const Color(0xFFBBF7D0)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            pointsEarned > 0
+                                ? Icons.stars_rounded
+                                : Icons.military_tech_rounded,
+                            color: pointsEarned > 0
+                                ? const Color(0xFF16A34A)
+                                : const Color(0xFF94A3B8),
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  pointsEarned > 0
+                                      ? '+$pointsEarned Poin'
+                                      : '0 Poin',
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: pointsEarned > 0
+                                        ? const Color(0xFF15803D)
+                                        : const Color(0xFF475569),
+                                  ),
+                                ),
+                                Text(
+                                  pointsEarned > 0
+                                      ? 'Berhasil ditambahkan ke saldo akun'
+                                      : 'Raih ubin 128 ke atas untuk mendapatkan poin',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 22),
                     SizedBox(

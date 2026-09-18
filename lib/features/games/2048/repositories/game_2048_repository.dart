@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/network/supabase_client.dart';
+import '../../../../core/services/activity_log_service.dart';
+import '../utils/game_2048_formatters.dart';
 
 @immutable
 class Game2048Result {
@@ -152,11 +154,28 @@ class Game2048Repository {
           .from('game_history')
           .select()
           .eq('id', runId)
-          .eq('user_id', userId)
           .single();
     }
+    // Calculate and award accumulated run points (1 entry per game in activity history)
+    final totalRunPoints = calculatePointsForMilestones(
+      milestoneCandidatesFor(highestTile),
+    );
 
-    await claimMilestones(milestoneCandidatesFor(highestTile));
+    if (totalRunPoints > 0) {
+      try {
+        await ActivityLogService.recordActivityAndAddPoints(
+          userId: userId,
+          points: totalRunPoints,
+          activityType: 'play_2048',
+          title: 'Bermain 2048',
+          description:
+              'Mencapai ubin $highestTile dengan skor ${format2048Score(score)} (+$totalRunPoints poin)',
+          referenceId: runId,
+        );
+      } catch (e) {
+        debugPrint('Warning: Failed to award accumulated run points: $e');
+      }
+    }
     return Game2048Result.fromJson(response);
   }
 
@@ -214,17 +233,65 @@ class Game2048Repository {
     );
   }
 
-  Future<Set<int>> claimMilestones(Set<int> candidates) async {
+  Future<Set<int>> fetchClaimedMilestones(String userId) async {
+    if (userId.isEmpty) return const {};
     final claimed = <int>{};
-    for (final milestone in candidates.toList()..sort()) {
-      if (rewardPointsFor(milestone) == null) continue;
-      final response = await _client.rpc(
-        'claim_2048_milestone',
-        params: buildMilestoneClaimParams(milestone),
-      );
-      if (response == true) claimed.add(milestone);
+
+    try {
+      final client = _client;
+      // 1. Try querying game_achievements table
+      try {
+        final rows = await client
+            .from('game_achievements')
+            .select('milestone')
+            .eq('user_id', userId)
+            .eq('game_type', '2048');
+        for (final row in rows as List) {
+          final m = (row['milestone'] as num?)?.toInt();
+          if (m != null) claimed.add(m);
+        }
+      } catch (_) {
+        // Table might not exist yet; proceed to check user_point_logs
+      }
+
+      // 2. Also check user_point_logs fallback
+      try {
+        final logRows = await client
+            .from('user_point_logs')
+            .select('reference_id')
+            .eq('user_id', userId)
+            .eq('activity_type', 'game_2048_milestone');
+        for (final row in logRows as List) {
+          final ref = row['reference_id']?.toString();
+          if (ref != null) {
+            final parsed = int.tryParse(ref);
+            if (parsed != null) claimed.add(parsed);
+          }
+        }
+      } catch (_) {}
+    } catch (_) {
+      // Supabase is uninitialized or offline
     }
+
     return claimed;
+  }
+
+  Future<Set<int>> claimMilestones(Set<int> candidates) async {
+    final valid = <int>{};
+    for (final milestone in candidates) {
+      if (rewardPointsFor(milestone) != null) {
+        valid.add(milestone);
+      }
+    }
+    return valid;
+  }
+
+  static int calculatePointsForMilestones(Iterable<int> milestones) {
+    var total = 0;
+    for (final m in milestones) {
+      total += rewardPointsFor(m) ?? 0;
+    }
+    return total;
   }
 
   Map<String, Object> buildMilestoneClaimParams(int milestone) {

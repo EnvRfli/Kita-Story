@@ -795,5 +795,43 @@ void main() {
 
       expect(provider.status, Game2048Status.gameOver);
     });
+
+    test('tracks newlyUnlockedMilestone, sessionClaimedMilestones, and sessionPointsEarned',
+        () async {
+      final repository = RecordingRepository(claimResponses: [
+        {128},
+      ]);
+      final provider = Game2048Provider(
+        engine: ScriptedEngine(
+          initialTiles: [tile(1, 64), tile(2, 64)],
+          results: [
+            result(
+              tiles: [tile(3, 128)],
+              scoreGained: 128,
+            ),
+          ],
+        ),
+        storage: MemoryStorage(),
+        repository: repository,
+      );
+      await provider.newGame();
+
+      expect(provider.sessionPointsEarned, 0);
+      expect(provider.newlyUnlockedMilestone, isNull);
+
+      provider.swipe(Game2048Direction.left);
+      expect(provider.newlyUnlockedMilestone, 128);
+
+      await provider.completeAnimation();
+      expect(provider.sessionClaimedMilestones, {128});
+      expect(provider.sessionPointsEarned, 2);
+
+      provider.clearNewlyUnlockedMilestone();
+      expect(provider.newlyUnlockedMilestone, isNull);
+
+      await provider.newGame();
+      expect(provider.sessionPointsEarned, 0);
+      expect(provider.sessionClaimedMilestones, isEmpty);
+    });
   });
 }

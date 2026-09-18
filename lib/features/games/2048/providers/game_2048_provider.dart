@@ -57,6 +57,24 @@ class Game2048Provider extends ChangeNotifier {
   List<int> get pendingMilestones =>
       List.unmodifiable(_pendingMilestoneSet.toList()..sort());
 
+  final Set<int> _sessionClaimedMilestones = <int>{};
+  Set<int> get sessionClaimedMilestones =>
+      Set.unmodifiable(_sessionClaimedMilestones);
+
+  int get sessionPointsEarned {
+    var total = 0;
+    for (final milestone in _sessionClaimedMilestones) {
+      total += Game2048Repository.rewardPointsFor(milestone) ?? 0;
+    }
+    return total;
+  }
+
+  int? _newlyUnlockedMilestone;
+  int? get newlyUnlockedMilestone => _newlyUnlockedMilestone;
+  void clearNewlyUnlockedMilestone() {
+    _newlyUnlockedMilestone = null;
+  }
+
   Game2048Status _status = Game2048Status.loading;
   Game2048Status get status => _status;
 
@@ -121,6 +139,8 @@ class Game2048Provider extends ChangeNotifier {
       _transitions = const [];
       _merges = const [];
       _pendingMilestoneSet.clear();
+      _sessionClaimedMilestones.clear();
+      _newlyUnlockedMilestone = null;
       _score = 0;
       _moveCount = 0;
       _elapsedSeconds = 0;
@@ -301,6 +321,7 @@ class Game2048Provider extends ChangeNotifier {
     try {
       final claimed = await _repository.claimMilestones(candidates);
       _pendingMilestoneSet.removeAll(claimed);
+      _sessionClaimedMilestones.addAll(claimed);
     } on Object {
       // Keep every candidate pending for a later retry.
     } finally {
@@ -486,6 +507,7 @@ class Game2048Provider extends ChangeNotifier {
       if (milestone > _highestMilestone) {
         _pendingMilestoneSet.add(milestone);
         _highestMilestone = milestone;
+        _newlyUnlockedMilestone = milestone;
       }
     }
   }
@@ -510,6 +532,8 @@ class Game2048Provider extends ChangeNotifier {
     _transitions = const [];
     _merges = const [];
     _pendingMilestoneSet.clear();
+    _sessionClaimedMilestones.clear();
+    _newlyUnlockedMilestone = null;
     _score = 0;
     _bestScore = bestScore;
     _moveCount = 0;

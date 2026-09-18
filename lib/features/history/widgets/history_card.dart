@@ -178,6 +178,19 @@ class HistoryCard extends StatelessWidget {
     final titleLower = rawTitle.toLowerCase();
     final typeLower = type.toLowerCase();
 
+    // 0. Games (2048, Sudoku) (Purple)
+    if (typeLower.contains('game') ||
+        typeLower.contains('2048') ||
+        typeLower.contains('sudoku') ||
+        titleLower.contains('2048') ||
+        titleLower.contains('sudoku')) {
+      return _ActivityVisuals(
+        icon: Icons.sports_esports_rounded,
+        iconColor: const Color(0xFF7C3AED),
+        backgroundColor: const Color(0xFFF3E8FF),
+      );
+    }
+
     // 1. Vacation / Travel (Sky Blue)
     if (typeLower.contains('vacation') ||
         titleLower.contains('liburan') ||

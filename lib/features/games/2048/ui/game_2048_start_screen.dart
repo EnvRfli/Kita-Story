@@ -11,6 +11,7 @@ import '../providers/game_2048_provider.dart';
 import '../repositories/game_2048_repository.dart';
 import '../services/game_2048_local_storage.dart';
 import '../utils/game_2048_formatters.dart';
+import '../widgets/game_2048_gamification_sheet.dart';
 import '../widgets/game_2048_history_bottom_sheet.dart';
 import 'game_2048_screen.dart';
 
@@ -37,6 +38,7 @@ class _Game2048StartScreenState extends State<Game2048StartScreen> {
   late final Game2048Repository _repository;
   Game2048Snapshot? _snapshot;
   List<Game2048LeaderboardEntry> _leaderboard = const [];
+  Set<int> _claimedMilestones = const {};
   int _localBestScore = 0;
   var _openingGame = false;
 
@@ -49,7 +51,23 @@ class _Game2048StartScreenState extends State<Game2048StartScreen> {
   }
 
   Future<void> _refresh() async {
-    await Future.wait([_loadSnapshot(), _loadLeaderboard()]);
+    await Future.wait([
+      _loadSnapshot(),
+      _loadLeaderboard(),
+      _loadClaimedMilestones(),
+    ]);
+  }
+
+  Future<void> _loadClaimedMilestones() async {
+    final userId = widget.currentUserId;
+    if (userId == null || userId.isEmpty) return;
+    try {
+      final claimed = await _repository.fetchClaimedMilestones(userId);
+      if (!mounted) return;
+      setState(() {
+        _claimedMilestones = claimed;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadSnapshot() async {
@@ -258,30 +276,53 @@ class _Game2048StartScreenState extends State<Game2048StartScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        // Pill badge with gradientBiru
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                        // Pill badge with gradientBiru (opens Gamification Bottom Sheet)
+                        GestureDetector(
+                          onTap: () => Game2048GamificationBottomSheet.show(
+                            context,
+                            claimedMilestones: _claimedMilestones,
                           ),
-                          decoration: BoxDecoration(
-                            gradient: AppColors.gradientBiru,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF6155F5)
-                                    .withValues(alpha: 0.28),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Text(
-                            'Hingga +120 poin',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12.5,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.gradientBiru,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF6155F5)
+                                      .withValues(alpha: 0.28),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.stars_rounded,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Hingga +120 poin per game',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(
+                                  Icons.info_outline_rounded,
+                                  color: Colors.white70,
+                                  size: 14,
+                                ),
+                              ],
                             ),
                           ),
                         ),

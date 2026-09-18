@@ -13,6 +13,7 @@ import 'package:kita_story/features/games/2048/ui/game_2048_screen.dart';
 import 'package:kita_story/features/games/2048/ui/game_2048_start_screen.dart';
 import 'package:kita_story/features/games/2048/utils/game_2048_formatters.dart';
 import 'package:kita_story/features/games/2048/widgets/game_2048_board.dart';
+import 'package:kita_story/features/games/2048/widgets/game_2048_gamification_sheet.dart';
 import 'package:kita_story/features/games/2048/widgets/game_2048_history_bottom_sheet.dart';
 import 'package:kita_story/features/games/2048/widgets/game_2048_tile_widget.dart';
 import 'package:kita_story/features/games/ui/games_screen.dart';
@@ -424,7 +425,7 @@ void main() {
 
     expect(find.text('Lanjutkan'), findsOneWidget);
     expect(find.text('Mulai Baru'), findsOneWidget);
-    expect(find.text('Hingga +120 poin'), findsOneWidget);
+    expect(find.text('Hingga +120 poin per game'), findsOneWidget);
     expect(assetImages, findsNWidgets(2));
 
     await tester.tap(find.text('Mulai Baru'));
@@ -911,5 +912,81 @@ void main() {
     await tester.tap(find.text('Main Lagi'));
     await tester.pumpAndSettle();
     expect(provider.status, Game2048Status.playing);
+  });
+
+  testWidgets(
+      'tapping start screen points pill opens gamification bottom sheet with milestones',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      _startHarness(
+        storage: _WidgetMemoryStorage(),
+        repository: _WidgetRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hingga +120 poin per game'), findsOneWidget);
+
+    await tester.tap(find.text('Hingga +120 poin per game'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Poin 2048'), findsOneWidget);
+    expect(find.text('Total Poin Permainan Ini'), findsOneWidget);
+    expect(find.text('0 / 120 Poin'), findsOneWidget);
+    expect(find.text('Ubin 128'), findsOneWidget);
+    expect(find.text('Ubin 2048'), findsOneWidget);
+    expect(find.text('+20 Poin'), findsOneWidget);
+    expect(find.text('Mengerti'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Mengerti'));
+    await tester.tap(find.text('Mengerti'));
+    await tester.pumpAndSettle();
+    expect(find.text('Poin 2048'), findsNothing);
+  });
+
+  testWidgets(
+      'gamification bottom sheet shows claimed status for achieved milestones',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Game2048GamificationBottomSheet(
+            claimedMilestones: {128, 256},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 128 (2 pts) + 256 (3 pts) = 5 pts
+    expect(find.text('5 / 120 Poin'), findsOneWidget);
+    expect(find.text('2 dari 7 ubin milestone berhasil dicapai'), findsOneWidget);
+    expect(find.text('Diklaim'), findsNWidgets(2));
+    expect(find.text('Belum'), findsNWidgets(5));
+  });
+
+  testWidgets(
+      'gameplay shows milestone celebration toast when milestone tile is formed',
+      (WidgetTester tester) async {
+    final provider = Game2048Provider(
+      engine: _WidgetScriptedEngine(
+        initialTiles: [_screenTile(1, 64), _screenTile(2, 64)],
+        results: [
+          _screenResult(tiles: [_screenTile(3, 128)], scoreGained: 128),
+        ],
+      ),
+      storage: _WidgetMemoryStorage(),
+      repository: _WidgetRepository(),
+    );
+    await provider.newGame();
+    await tester.pumpWidget(_screenHarness(provider));
+    await tester.pumpAndSettle();
+
+    provider.swipe(Game2048Direction.left);
+    await tester.pump();
+
+    // Milestone banner pops up
+    expect(find.text('Ubin 128 Tercapai!'), findsOneWidget);
+    expect(find.text('+2 Poin masuk ke akunmu'), findsOneWidget);
   });
 }

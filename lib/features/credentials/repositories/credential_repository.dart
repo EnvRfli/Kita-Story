@@ -95,7 +95,8 @@ class CredentialRepository {
 
   /// Menambahkan kredensial baru (Mendapatkan +5 Poin atau +10 Poin jika dibagikan ke pasangan)
   Future<CredentialModel> addCredential(CredentialModel credential) async {
-    final payload = credential.toJson(targetUserId: credential.userId)..remove('id');
+    final payload = credential.toJson(targetUserId: credential.userId)
+      ..remove('id');
     final data = await _client
         .from('user_credentials')
         .insert(payload)
@@ -124,7 +125,8 @@ class CredentialRepository {
 
   /// Memperbarui kredensial yang ada
   Future<CredentialModel> updateCredential(CredentialModel credential) async {
-    final payload = credential.toJson(targetUserId: credential.userId)..remove('id');
+    final payload = credential.toJson(targetUserId: credential.userId)
+      ..remove('id');
     final data = await _client
         .from('user_credentials')
         .update(payload)

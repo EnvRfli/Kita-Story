@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../models/game_2048_move.dart';
 import '../providers/game_2048_provider.dart';
+import '../repositories/game_2048_repository.dart';
 import '../utils/game_2048_formatters.dart';
 import '../widgets/game_2048_board.dart';
 import '../widgets/game_2048_result_overlay.dart';
@@ -43,6 +44,8 @@ class _Game2048ScreenState extends State<Game2048Screen> {
                         tile: provider.highestTile,
                         elapsedSeconds: provider.elapsedSeconds,
                         movesCount: provider.moveCount,
+                        pointsEarned:
+                            Game2048Repository.rewardPointsFor(2048) ?? 20,
                         onContinue: provider.continueAfter2048,
                         onHome: () => _finishAndExit(context, provider),
                       ),
@@ -52,12 +55,28 @@ class _Game2048ScreenState extends State<Game2048Screen> {
                         highestTile: provider.highestTile,
                         isNewRecord: provider.score > 0 &&
                             provider.score >= provider.bestScore,
+                        pointsEarned: provider.sessionPointsEarned,
                         onPlayAgain: _isExitActionPending
                             ? () {}
                             : () => unawaited(_playAgain(provider)),
                         onBack: _isExitActionPending
                             ? () {}
                             : () => _finishAndExit(context, provider),
+                      ),
+                    if (provider.newlyUnlockedMilestone != null &&
+                        provider.status == Game2048Status.playing)
+                      Positioned(
+                        top: 12,
+                        left: 16,
+                        right: 16,
+                        child: _MilestoneNotificationBanner(
+                          key: ValueKey(provider.newlyUnlockedMilestone),
+                          milestone: provider.newlyUnlockedMilestone!,
+                          points: Game2048Repository.rewardPointsFor(
+                                  provider.newlyUnlockedMilestone!) ??
+                              0,
+                          onDismiss: provider.clearNewlyUnlockedMilestone,
+                        ),
                       ),
                   ],
                 ),
@@ -693,6 +712,152 @@ class _UndoButton extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MilestoneNotificationBanner extends StatefulWidget {
+  const _MilestoneNotificationBanner({
+    super.key,
+    required this.milestone,
+    required this.points,
+    required this.onDismiss,
+  });
+
+  final int milestone;
+  final int points;
+  final VoidCallback onDismiss;
+
+  @override
+  State<_MilestoneNotificationBanner> createState() =>
+      _MilestoneNotificationBannerState();
+}
+
+class _MilestoneNotificationBannerState
+    extends State<_MilestoneNotificationBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _slideAnimation;
+  late final Animation<double> _opacityAnimation;
+  Timer? _dismissTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    )..forward();
+    _slideAnimation = Tween<double>(begin: -24, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    _opacityAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeIn,
+    );
+
+    _dismissTimer = Timer(const Duration(milliseconds: 3800), _dismiss);
+  }
+
+  void _dismiss() {
+    if (!mounted) return;
+    _controller.reverse().then((_) {
+      if (mounted) widget.onDismiss();
+    });
+  }
+
+  @override
+  void dispose() {
+    _dismissTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(0, _slideAnimation.value),
+        child: Opacity(
+          opacity: _opacityAnimation.value,
+          child: child,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: GestureDetector(
+          onTap: _dismiss,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFFDE68A),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text('🎉', style: TextStyle(fontSize: 18)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Ubin ${widget.milestone} Tercapai!',
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      const SizedBox(height: 1.5),
+                      Text(
+                        '+${widget.points} Poin masuk ke akunmu',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF16A34A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    size: 17,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  onPressed: _dismiss,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
