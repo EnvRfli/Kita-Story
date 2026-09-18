@@ -39,7 +39,8 @@ class HistoryRepository {
         app_users (
           id,
           name,
-          photo_url
+          photo_url,
+          gender
         )
       ''');
 
@@ -54,8 +55,8 @@ class HistoryRepository {
 
       final List<dynamic> data = response as List<dynamic>;
       var logs = data
-          .map((json) =>
-              ActivityLogModel.fromJson(json as Map<String, dynamic>))
+          .map(
+              (json) => ActivityLogModel.fromJson(json as Map<String, dynamic>))
           .toList();
 
       // 3. Dynamic Multi-Feature Title Resolver for legacy / existing logs
@@ -105,6 +106,7 @@ class HistoryRepository {
                   userId: log.userId,
                   userName: log.userName,
                   userPhotoUrl: log.userPhotoUrl,
+                  userGender: log.userGender,
                   activityType: log.activityType,
                   title: log.title,
                   description: desc,
@@ -154,6 +156,7 @@ class HistoryRepository {
                   userId: log.userId,
                   userName: log.userName,
                   userPhotoUrl: log.userPhotoUrl,
+                  userGender: log.userGender,
                   activityType: log.activityType,
                   title: log.title,
                   description: 'Menyelesaikan seluruh isi catatan "$nTitle"',
@@ -202,6 +205,7 @@ class HistoryRepository {
                   userId: log.userId,
                   userName: log.userName,
                   userPhotoUrl: log.userPhotoUrl,
+                  userGender: log.userGender,
                   activityType: log.activityType,
                   title: log.title,
                   description: 'Menyelesaikan pengingat "$rTitle"',
@@ -221,8 +225,7 @@ class HistoryRepository {
         final queryLower = searchQuery.trim().toLowerCase();
         logs = logs.where((log) {
           final titleMatch = log.title.toLowerCase().contains(queryLower);
-          final descMatch =
-              log.description.toLowerCase().contains(queryLower);
+          final descMatch = log.description.toLowerCase().contains(queryLower);
           final userMatch =
               log.userName?.toLowerCase().contains(queryLower) ?? false;
           return titleMatch || descMatch || userMatch;

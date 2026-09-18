@@ -1,9 +1,13 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:kita_story/core/network/supabase_client.dart';
 import 'package:kita_story/features/games/sudoku/providers/sudoku_provider.dart';
 import 'package:kita_story/features/games/sudoku/ui/sudoku_game_screen.dart';
+import 'package:kita_story/features/games/sudoku/utils/sudoku_formatters.dart';
+import 'package:kita_story/features/games/sudoku/widgets/sudoku_history_bottom_sheet.dart';
 import 'package:kita_story/features/games/sudoku/widgets/sudoku_mode_bottom_sheet.dart';
 
 class SudokuStartScreen extends StatefulWidget {
@@ -16,10 +20,17 @@ class SudokuStartScreen extends StatefulWidget {
 class _SudokuStartScreenState extends State<SudokuStartScreen> {
   bool _isLoading = true;
   Map<String, int?> _bestTimes = {
-    'Mudah': null,
-    'Normal': null,
-    'Susah': null,
-    'Sangat Susah': null,
+    'mudah': null,
+    'normal': null,
+    'susah': null,
+    'sangat susah': null,
+  };
+  String? _currentUserId;
+  Map<String, List<SudokuHistoryEntry>> _historyByDifficulty = {
+    'mudah': [],
+    'normal': [],
+    'susah': [],
+    'sangat susah': [],
   };
 
   @override
@@ -37,24 +48,65 @@ class _SudokuStartScreenState extends State<SudokuStartScreen> {
         return;
       }
 
+      final currentProfile = await client
+          .from('app_users')
+          .select('id, name, photo_url, partner_id')
+          .eq('id', user.id)
+          .maybeSingle();
+      final partnerId = currentProfile?['partner_id'] as String?;
+      final userIds = [
+        user.id,
+        if (partnerId != null && partnerId.isNotEmpty) partnerId,
+      ];
+
+      final profileRows = await client
+          .from('app_users')
+          .select('id, name, photo_url')
+          .inFilter('id', userIds);
+      final profiles = <String, Map<String, dynamic>>{
+        for (final row in profileRows)
+          row['id'] as String: Map<String, dynamic>.from(row),
+      };
+
       final response = await client
           .from('game_history')
-          .select('difficulty, duration_seconds')
+          .select('user_id, difficulty, duration_seconds, created_at')
           .eq('game_type', 'sudoku')
-          .eq('user_id', user.id)
-          .eq('status', 'completed');
+          .eq('status', 'completed')
+          .inFilter('user_id', userIds)
+          .order('created_at', ascending: false);
 
       Map<String, int?> best = {
-        'Mudah': null,
-        'Normal': null,
-        'Susah': null,
-        'Sangat Susah': null,
+        'mudah': null,
+        'normal': null,
+        'susah': null,
+        'sangat susah': null,
+      };
+      final histories = <String, List<SudokuHistoryEntry>>{
+        'mudah': [],
+        'normal': [],
+        'susah': [],
+        'sangat susah': [],
       };
 
       for (var row in response) {
-        String diff = row['difficulty'] as String;
+        final diff = (row['difficulty'] as String)
+            .trim()
+            .toLowerCase()
+            .replaceAll('_', ' ');
         int duration = row['duration_seconds'] as int;
         if (best.containsKey(diff)) {
+          final rowUserId = row['user_id'] as String;
+          final profile = profiles[rowUserId];
+          histories[diff]!.add(
+            SudokuHistoryEntry(
+              userId: rowUserId,
+              userName: profile?['name'] as String? ?? 'Pengguna',
+              photoUrl: profile?['photo_url'] as String?,
+              durationSeconds: duration,
+              completedAt: DateTime.parse(row['created_at'] as String),
+            ),
+          );
           int? currentBest = best[diff];
           if (currentBest == null || duration < currentBest) {
             best[diff] = duration;
@@ -65,6 +117,8 @@ class _SudokuStartScreenState extends State<SudokuStartScreen> {
       if (mounted) {
         setState(() {
           _bestTimes = best;
+          _historyByDifficulty = histories;
+          _currentUserId = user.id;
           _isLoading = false;
         });
       }
@@ -76,96 +130,118 @@ class _SudokuStartScreenState extends State<SudokuStartScreen> {
     }
   }
 
-  String _formatDuration(int? seconds) {
-    if (seconds == null) return '-';
-    if (seconds < 60) return '$seconds detik';
-    final minutes = seconds ~/ 60;
-    final hrs = minutes ~/ 60;
-    final mins = minutes % 60;
-    if (hrs > 0) {
-      if (mins == 0) return '$hrs jam';
-      return '$hrs jam $mins menit';
-    }
-    return '$minutes menit';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFCFCFD),
+      backgroundColor: const Color(0xFFF8F9FE),
       body: Stack(
         children: [
-          // Background Blur / Gradient Effect
           Positioned(
-            top: -50,
-            left: -50,
-            right: -50,
-            height: 300,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF0088FF).withValues(alpha: 0.15),
-                    const Color(0xFFFCFCFD).withValues(alpha: 0.0),
-                  ],
-                  radius: 0.8,
-                ),
+            top: -28,
+            left: -20,
+            right: -20,
+            height: 420,
+            child: ClipRect(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Opacity(
+                    opacity: 0.62,
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: Image.asset(
+                        'lib/assets/game screen/image 83.png',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                        errorBuilder: (_, __, ___) => const ColoredBox(
+                          color: Color(0xFFD9EBFF),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x1AFFFFFF),
+                          Color(0x33FFFFFF),
+                          Color(0xB3F8F9FE),
+                          Color(0xFFF8F9FE),
+                          Color(0xFFF8F9FE),
+                        ],
+                        stops: [0, 0.25, 0.62, 0.82, 1],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
           SafeArea(
+            bottom: false,
             child: Column(
               children: [
                 _buildHeader(context),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 55, 16, 112),
                     child: Column(
                       children: [
-                        const SizedBox(height: 24),
-                        // Sudoku Icon Placeholder
                         Container(
-                          width: 80,
-                          height: 80,
+                          width: 92,
+                          height: 92,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0088FF),
-                            borderRadius: BorderRadius.circular(20),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(23),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF0088FF).withValues(alpha: 0.3),
-                                blurRadius: 16,
+                                color: const Color(0xFF2563EB)
+                                    .withValues(alpha: 0.24),
+                                blurRadius: 18,
                                 offset: const Offset(0, 8),
-                              )
+                              ),
                             ],
                           ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            '9',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 48,
-                              fontWeight: FontWeight.w900,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(23),
+                            child: Image.asset(
+                              'lib/assets/game screen/image 83.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.grid_on_rounded,
+                                color: Color(0xFF2563EB),
+                                size: 46,
+                              ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 22),
                         const Text(
                           'Sudoku',
                           style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF1E293B),
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF334155),
+                            letterSpacing: -0.3,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF6B4454), // Maroon/Purple accent
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF7047F6), Color(0xFF0088FF)],
+                            ),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Text(
-                            '125 poin', // Example points
+                            '10–100 poin',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
@@ -173,21 +249,34 @@ class _SudokuStartScreenState extends State<SudokuStartScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 40),
-                        
+                        const SizedBox(height: 22),
                         if (_isLoading)
                           const Padding(
-                            padding: EdgeInsets.all(40.0),
+                            padding: EdgeInsets.all(40),
                             child: CircularProgressIndicator(),
                           )
                         else ...[
-                          _buildHistoryTile('Mudah', _formatDuration(_bestTimes['Mudah'])),
-                          _buildHistoryTile('Normal', _formatDuration(_bestTimes['Normal'])),
-                          _buildHistoryTile('Susah', _formatDuration(_bestTimes['Susah'])),
-                          _buildHistoryTile('Sangat Susah', _formatDuration(_bestTimes['Sangat Susah'])),
+                          _buildHistoryTile(
+                            'mudah',
+                            'Mudah',
+                            formatSudokuDuration(_bestTimes['mudah']),
+                          ),
+                          _buildHistoryTile(
+                            'normal',
+                            'Normal',
+                            formatSudokuDuration(_bestTimes['normal']),
+                          ),
+                          _buildHistoryTile(
+                            'susah',
+                            'Susah',
+                            formatSudokuDuration(_bestTimes['susah']),
+                          ),
+                          _buildHistoryTile(
+                            'sangat susah',
+                            'Sangat Susah',
+                            formatSudokuDuration(_bestTimes['sangat susah']),
+                          ),
                         ],
-                        
-                        const SizedBox(height: 100), // Space for button
                       ],
                     ),
                   ),
@@ -195,106 +284,186 @@ class _SudokuStartScreenState extends State<SudokuStartScreen> {
               ],
             ),
           ),
-          
-          // Start Button at bottom
           Positioned(
-            left: 24,
-            right: 24,
-            bottom: 32,
-            child: SizedBox(
-              height: 56,
-              child: ElevatedButton(
-                onPressed: () {
-                   // Refresh data when returning from game
-                   _showModeSelector(context).then((_) {
-                      if (mounted) {
-                        setState(() => _isLoading = true);
-                        _fetchBestTimes();
-                      }
-                   });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0088FF),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.paddingOf(context).bottom + 16,
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0795FF), Color(0xFF087CE5)],
+                ),
+                borderRadius: BorderRadius.circular(13),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0088FF).withValues(alpha: 0.28),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
                   ),
-                  elevation: 0,
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: _handleStart,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(13),
+                  ),
                 ),
                 child: const Text(
                   'Mulai',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
                 ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
+  }
+
+  void _handleStart() {
+    _showModeSelector(context).then((_) {
+      if (mounted) {
+        setState(() => _isLoading = true);
+        _fetchBestTimes();
+      }
+    });
   }
 
   Widget _buildHeader(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1E293B), size: 22),
-            onPressed: () => context.pop(),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.92),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF334155),
+                size: 22,
+              ),
+              onPressed: () => context.pop(),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHistoryTile(String difficulty, String timeStr) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.wb_sunny_rounded, color: Color(0xFFFFB020), size: 20),
-              const SizedBox(width: 12),
-              Text(
-                difficulty,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1E293B),
+  Widget _buildHistoryTile(
+    String difficultyKey,
+    String difficulty,
+    String timeStr,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: () => _showHistory(difficultyKey, difficulty),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 58),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF475569).withValues(alpha: 0.06),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
-              ),
-            ],
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.wb_sunny_rounded,
+                  color: Color(0xFFFFC928),
+                  size: 21,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    difficulty,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF334155),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.alarm_rounded,
+                      color: const Color(0xFF0088FF),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      timeStr,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: timeStr == '-'
+                            ? const Color(0xFFFFA340)
+                            : const Color(0xFFFF7A00),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFFCBD5E1),
+                  size: 20,
+                ),
+              ],
+            ),
           ),
-          Row(
-            children: [
-              Icon(
-                Icons.alarm_rounded,
-                color: timeStr == '-' ? const Color(0xFF94A3B8) : const Color(0xFF0088FF),
-                size: 18,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                timeStr,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: timeStr == '-' ? const Color(0xFF94A3B8) : const Color(0xFFFF8A00),
-                ),
-              ),
-            ],
-          )
-        ],
+        ),
+      ),
+    );
+  }
+
+  void _showHistory(String difficultyKey, String difficultyLabel) {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => SudokuHistoryBottomSheet(
+        difficulty: difficultyLabel,
+        currentUserId: currentUserId,
+        entries: _historyByDifficulty[difficultyKey] ?? const [],
       ),
     );
   }
@@ -312,9 +481,9 @@ class _SudokuStartScreenState extends State<SudokuStartScreen> {
         MaterialPageRoute(
           builder: (_) => ChangeNotifierProvider(
             create: (_) {
-               final provider = SudokuProvider();
-               provider.startGame(selectedMode);
-               return provider;
+              final provider = SudokuProvider();
+              provider.startGame(selectedMode);
+              return provider;
             },
             child: const SudokuGameScreen(),
           ),

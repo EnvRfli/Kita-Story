@@ -8,6 +8,47 @@ import '../widgets/credential_card.dart';
 import '../widgets/credential_detail_bottom_sheet.dart';
 import 'package:kita_story/core/widgets/bouncy_filter_chip.dart';
 
+class CredentialsHeader extends StatelessWidget {
+  const CredentialsHeader({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFFCFCFD),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: Color(0xFF1E293B),
+              size: 22,
+            ),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              }
+            },
+          ),
+          const Expanded(
+            child: Text(
+              'Kredensial',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF1E293B),
+                fontWeight: FontWeight.w800,
+                fontSize: 19,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ),
+          const SizedBox(width: 48),
+        ],
+      ),
+    );
+  }
+}
+
 class CredentialsScreen extends StatefulWidget {
   const CredentialsScreen({super.key});
 
@@ -72,38 +113,7 @@ class _CredentialsScreenState extends State<CredentialsScreen> {
         child: Column(
           children: [
             // 1. Header Bar
-            Container(
-              color: const Color(0xFFFCFCFD),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: Color(0xFF1E293B),
-                      size: 22,
-                    ),
-                    onPressed: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      }
-                    },
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'Kredensial',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Color(0xFF1E293B),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 19,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            const CredentialsHeader(),
 
             // 2. Search Field (History screen style)
             Padding(

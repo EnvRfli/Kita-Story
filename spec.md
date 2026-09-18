@@ -164,6 +164,7 @@ CREATE TABLE IF NOT EXISTS app_users (
   name TEXT NOT NULL,
   password_hash TEXT NOT NULL DEFAULT 'managed_by_supabase_auth',
   birthdate DATE,
+  gender TEXT CHECK (gender IS NULL OR gender IN ('female', 'male')),
   points INTEGER NOT NULL DEFAULT 0,
   photo_url TEXT,
   partner_id UUID REFERENCES app_users(id) ON DELETE SET NULL,

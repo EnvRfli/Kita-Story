@@ -10,7 +10,7 @@ enum SudokuGameState { initial, playing, won, lost }
 
 class SudokuProvider extends ChangeNotifier {
   final SudokuEngine _engine = SudokuEngine();
-  
+
   List<List<SudokuCell>> _grid = [];
   List<List<SudokuCell>> get grid => _grid;
 
@@ -52,14 +52,25 @@ class SudokuProvider extends ChangeNotifier {
 
   int get pointsForDifficulty {
     switch (_difficulty.toLowerCase()) {
-      case 'mudah': return 50;
-      case 'normal': return 125;
-      case 'susah': return 200;
+      case 'sangat mudah':
+      case 'sangat_mudah':
+        return 0;
+      case 'mudah':
+        return 10;
+      case 'normal':
+        return 25;
+      case 'susah':
+        return 50;
       case 'sangat susah':
-      case 'sangat_susah': return 300;
-      default: return 50;
+      case 'sangat_susah':
+        return 100;
+      default:
+        return 50;
     }
   }
+
+  bool get isTestingDifficulty =>
+      _difficulty.toLowerCase().replaceAll('_', ' ') == 'sangat mudah';
 
   void startGame(String difficulty) {
     _difficulty = difficulty;
@@ -70,7 +81,7 @@ class SudokuProvider extends ChangeNotifier {
     _hintsLeft = 3;
     _elapsedSeconds = 0;
     _gameState = SudokuGameState.playing;
-    
+
     _startTimer();
     notifyListeners();
   }
@@ -90,7 +101,7 @@ class SudokuProvider extends ChangeNotifier {
   void selectCell(int row, int col) {
     if (_gameState != SudokuGameState.playing) return;
     if (_selectedCell?.row == row && _selectedCell?.col == col) return;
-    
+
     _selectedCell = SudokuPosition(row, col);
     _currentHint = null;
     notifyListeners();
@@ -129,6 +140,8 @@ class SudokuProvider extends ChangeNotifier {
   }
 
   Future<void> _saveGameAndPoints() async {
+    if (isTestingDifficulty) return;
+
     final client = SupabaseNetwork.client;
     final user = client.auth.currentUser;
     if (user == null) return;
@@ -136,21 +149,28 @@ class SudokuProvider extends ChangeNotifier {
     final points = pointsForDifficulty;
 
     try {
-      final response = await client.from('game_history').insert({
-        'game_type': 'sudoku',
-        'difficulty': _difficulty,
-        'user_id': user.id,
-        'duration_seconds': _elapsedSeconds,
-        'score': points,
-        'status': 'completed'
-      }).select().single();
+      final partnerId = await _fetchPartnerId(user.id);
+      final response = await client
+          .from('game_history')
+          .insert({
+            'game_type': 'sudoku',
+            'difficulty': _difficulty,
+            'user_id': user.id,
+            if (partnerId != null) 'partner_id': partnerId,
+            'duration_seconds': _elapsedSeconds,
+            'score': points,
+            'status': 'completed'
+          })
+          .select()
+          .single();
 
       await ActivityLogService.recordActivityAndAddPoints(
         userId: user.id,
         points: points,
         activityType: 'play_sudoku',
         title: 'Bermain Sudoku ($_difficulty)',
-        description: 'Menyelesaikan Sudoku level $_difficulty dalam waktu $_elapsedSeconds detik.',
+        description:
+            'Menyelesaikan Sudoku level $_difficulty dalam waktu $_elapsedSeconds detik.',
         referenceId: response['id'],
       );
     } catch (e) {
@@ -159,15 +179,19 @@ class SudokuProvider extends ChangeNotifier {
   }
 
   Future<void> _saveLostGame() async {
+    if (isTestingDifficulty) return;
+
     final client = SupabaseNetwork.client;
     final user = client.auth.currentUser;
     if (user == null) return;
 
     try {
+      final partnerId = await _fetchPartnerId(user.id);
       await client.from('game_history').insert({
         'game_type': 'sudoku',
         'difficulty': _difficulty,
         'user_id': user.id,
+        if (partnerId != null) 'partner_id': partnerId,
         'duration_seconds': _elapsedSeconds,
         'score': 0,
         'status': 'failed'
@@ -177,11 +201,20 @@ class SudokuProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> _fetchPartnerId(String userId) async {
+    final profile = await SupabaseNetwork.client
+        .from('app_users')
+        .select('partner_id')
+        .eq('id', userId)
+        .maybeSingle();
+    return profile?['partner_id'] as String?;
+  }
+
   void eraseSelected() {
     if (_gameState != SudokuGameState.playing || _selectedCell == null) return;
     int r = _selectedCell!.row;
     int c = _selectedCell!.col;
-    
+
     if (_grid[r][c].isFixed) return;
 
     _grid[r][c].value = 0;
@@ -192,6 +225,9 @@ class SudokuProvider extends ChangeNotifier {
   SudokuHint? getHint() {
     if (_gameState != SudokuGameState.playing || _hintsLeft <= 0) return null;
     _currentHint = _engine.getLogicalHint(_grid);
+    if (_currentHint != null) {
+      _hintsLeft--;
+    }
     notifyListeners();
     return _currentHint;
   }
@@ -204,17 +240,16 @@ class SudokuProvider extends ChangeNotifier {
   }
 
   void applyHint(SudokuHint hint) {
-    if (_gameState != SudokuGameState.playing || _hintsLeft <= 0) return;
-    
-    _hintsLeft--;
+    if (_gameState != SudokuGameState.playing) return;
+
     _grid[hint.row][hint.col].value = hint.value;
     _grid[hint.row][hint.col].hasError = false;
     _currentHint = null;
-    
+
     if (_engine.isGameWon(_grid)) {
-       _gameState = SudokuGameState.won;
-       _timer?.cancel();
-       _saveGameAndPoints();
+      _gameState = SudokuGameState.won;
+      _timer?.cancel();
+      _saveGameAndPoints();
     }
     notifyListeners();
   }

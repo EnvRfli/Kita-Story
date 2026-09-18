@@ -19,6 +19,10 @@ class SudokuEngine {
     // 2. Remove cells based on difficulty
     int cellsToRemove;
     switch (difficulty.toLowerCase()) {
+      case 'sangat mudah':
+      case 'sangat_mudah':
+        cellsToRemove = _random.nextInt(3) + 4; // Testing: 4-6 empty cells
+        break;
       case 'mudah':
         cellsToRemove =
             _random.nextInt(10) + 36; // 36-45 removed -> 36-45 filled

@@ -5,6 +5,7 @@ class ActivityLogModel {
   final String userId;
   final String? userName;
   final String? userPhotoUrl;
+  final String? userGender;
   final String activityType;
   final String title;
   final String description;
@@ -17,6 +18,7 @@ class ActivityLogModel {
     required this.userId,
     this.userName,
     this.userPhotoUrl,
+    this.userGender,
     required this.activityType,
     required this.title,
     required this.description,
@@ -28,10 +30,12 @@ class ActivityLogModel {
   factory ActivityLogModel.fromJson(Map<String, dynamic> json) {
     String? name;
     String? photo;
+    String? gender;
     if (json['app_users'] is Map<String, dynamic>) {
       final userMap = json['app_users'] as Map<String, dynamic>;
       name = userMap['name'] as String? ?? userMap['display_name'] as String?;
       photo = userMap['photo_url'] as String?;
+      gender = userMap['gender'] as String?;
     }
 
     return ActivityLogModel(
@@ -39,6 +43,7 @@ class ActivityLogModel {
       userId: json['user_id'] as String? ?? '',
       userName: name,
       userPhotoUrl: photo,
+      userGender: gender,
       activityType: json['activity_type'] as String? ?? 'general',
       title: json['title'] as String? ?? 'Aktivitas Baru',
       description: json['description'] as String? ?? '',

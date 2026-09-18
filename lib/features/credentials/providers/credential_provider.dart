@@ -4,6 +4,17 @@ import '../models/credential_category_model.dart';
 import '../models/credential_subcategory_model.dart';
 import '../repositories/credential_repository.dart';
 
+bool credentialMatchesSearch(CredentialModel credential, String query) {
+  final normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.isEmpty) return true;
+
+  return credential.title.toLowerCase().contains(normalizedQuery) ||
+      credential.subcategoryName.toLowerCase().contains(normalizedQuery) ||
+      credential.fields.any(
+        (field) => field.value.toLowerCase().contains(normalizedQuery),
+      );
+}
+
 class CredentialProvider extends ChangeNotifier {
   final CredentialRepository _repository = CredentialRepository();
 
@@ -50,25 +61,7 @@ class CredentialProvider extends ChangeNotifier {
 
       // 2. Filter Pencarian
       if (_searchQuery.trim().isEmpty) return true;
-      final q = _searchQuery.trim().toLowerCase();
-
-      final titleMatch = item.title.toLowerCase().contains(q);
-      final fieldsMatch = item.fields.any((f) =>
-          f.label.toLowerCase().contains(q) ||
-          f.value.toLowerCase().contains(q));
-      final userMatch = item.usernameId?.toLowerCase().contains(q) ?? false;
-      final emailMatch = item.email?.toLowerCase().contains(q) ?? false;
-      final subMatch = item.subcategoryName.toLowerCase().contains(q);
-      final rekMatch = item.nomorRekening?.toLowerCase().contains(q) ?? false;
-      final ketMatch = item.keterangan?.toLowerCase().contains(q) ?? false;
-
-      return titleMatch ||
-          fieldsMatch ||
-          userMatch ||
-          emailMatch ||
-          subMatch ||
-          rekMatch ||
-          ketMatch;
+      return credentialMatchesSearch(item, _searchQuery);
     }).toList();
   }
 
@@ -99,7 +92,8 @@ class CredentialProvider extends ChangeNotifier {
   /// Memuat ulang daftar kredensial
   Future<void> fetchCredentials(String userId, {String? partnerId}) async {
     try {
-      _credentials = await _repository.fetchCredentials(userId, partnerId: partnerId);
+      _credentials =
+          await _repository.fetchCredentials(userId, partnerId: partnerId);
       notifyListeners();
     } catch (e) {
       _errorMessage = 'Gagal memuat kredensial.';

@@ -82,7 +82,10 @@ class HistoryCard extends StatelessWidget {
           Row(
             children: [
               // User Tag Pill
-              _buildUserPill(log.userName ?? 'User'),
+              _buildUserPill(
+                log.userName ?? 'User',
+                gender: log.userGender,
+              ),
               const SizedBox(width: 8),
 
               // Points Badge
@@ -147,11 +150,8 @@ class HistoryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildUserPill(String name) {
-    final isPink = name.toLowerCase().contains('nay') ||
-        name.toLowerCase().contains('cewe') ||
-        name.toLowerCase().contains('putri') ||
-        name.toLowerCase().contains('anisa');
+  Widget _buildUserPill(String name, {String? gender}) {
+    final isPink = gender?.trim().toLowerCase() == 'female';
 
     final bgColor = isPink ? const Color(0xFFFFD6EC) : const Color(0xFFD0EBFF);
     final textColor =

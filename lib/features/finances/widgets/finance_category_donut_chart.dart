@@ -181,7 +181,8 @@ class _DonutChartPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     // Slim radius & stroke width (11.0px) for elegant thin donut ring
     const strokeWidth = 11.0;
-    final radius = (math.min(size.width, size.height) / 2) - (strokeWidth / 2) - 2;
+    final radius =
+        (math.min(size.width, size.height) / 2) - (strokeWidth / 2) - 2;
     final rect = Rect.fromCircle(center: center, radius: radius);
 
     double startAngle = -math.pi / 2; // Start from top 12 o'clock
@@ -199,8 +200,10 @@ class _DonutChartPainter extends CustomPainter {
         ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.butt;
 
-      final effectiveSweep = hasMultiple ? math.max(0.01, sweepAngle - gapAngle) : sweepAngle;
-      final effectiveStart = hasMultiple ? startAngle + (gapAngle / 2) : startAngle;
+      final effectiveSweep =
+          hasMultiple ? math.max(0.01, sweepAngle - gapAngle) : sweepAngle;
+      final effectiveStart =
+          hasMultiple ? startAngle + (gapAngle / 2) : startAngle;
 
       canvas.drawArc(rect, effectiveStart, effectiveSweep, false, paint);
       startAngle += sweepAngle;

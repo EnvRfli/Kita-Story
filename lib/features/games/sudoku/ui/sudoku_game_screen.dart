@@ -20,11 +20,18 @@ class SudokuGameScreen extends StatelessWidget {
             // Normally you'd use a listener in initState or didChangeDependencies,
             // but for simplicity we can show dialogs here or just update UI.
 
-              return Stack(
+            return PopScope(
+              canPop: provider.gameState != SudokuGameState.playing,
+              onPopInvokedWithResult: (didPop, _) {
+                if (!didPop) {
+                  _requestExit(context, provider);
+                }
+              },
+              child: Stack(
                 children: [
                   Column(
                     children: [
-                      _buildHeader(context),
+                      _buildHeader(context, provider),
                       _buildInfoBar(provider),
                       const SizedBox(height: 24),
                       Expanded(
@@ -33,7 +40,8 @@ class SudokuGameScreen extends StatelessWidget {
                             children: [
                               // Sudoku Grid
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
                                 child: Center(
                                   child: SudokuGrid(
                                     grid: provider.grid,
@@ -46,7 +54,8 @@ class SudokuGameScreen extends StatelessWidget {
                               const SizedBox(height: 32),
                               // NumPad
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
                                 child: SudokuNumPad(
                                   onNumberSelected: provider.inputNumber,
                                   onErase: provider.eraseSelected,
@@ -62,11 +71,14 @@ class SudokuGameScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  
+
                   // Show overlays if game ended
                   if (provider.gameState == SudokuGameState.won)
                     GameWonOverlay(
                       points: provider.pointsForDifficulty,
+                      elapsedSeconds: provider.elapsedSeconds,
+                      difficulty: provider.difficulty,
+                      isTestingMode: provider.isTestingDifficulty,
                       onHome: () => context.pop(),
                     ),
                   if (provider.gameState == SudokuGameState.lost)
@@ -77,14 +89,15 @@ class SudokuGameScreen extends StatelessWidget {
                       child: _buildGameResult(context, false, 0),
                     ),
                 ],
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
+      ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, SudokuProvider provider) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Row(
@@ -92,7 +105,7 @@ class SudokuGameScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.arrow_back_rounded,
                 color: Color(0xFF1E293B), size: 22),
-            onPressed: () => context.pop(),
+            onPressed: () => _requestExit(context, provider),
           ),
           const Expanded(
             child: Text(
@@ -110,6 +123,91 @@ class SudokuGameScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _requestExit(
+    BuildContext context,
+    SudokuProvider provider,
+  ) async {
+    if (provider.gameState != SudokuGameState.playing) {
+      context.pop();
+      return;
+    }
+
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        icon: Container(
+          width: 58,
+          height: 58,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFF3E8),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.sports_esports_rounded,
+            color: Color(0xFFFF7A00),
+            size: 30,
+          ),
+        ),
+        title: const Text(
+          'Keluar dari permainan?',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0xFF1E293B),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        content: const Text(
+          'Progres permainan ini akan hilang jika kamu keluar sekarang.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Color(0xFF64748B), height: 1.45),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                  ),
+                  child: const Text('Lanjut Bermain'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF6B6B),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                  ),
+                  child: const Text('Keluar Permainan'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true && context.mounted) {
+      context.pop();
+    }
   }
 
   Widget _buildInfoBar(SudokuProvider provider) {

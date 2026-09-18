@@ -80,7 +80,8 @@ class FinanceBudgetOverviewSlide extends StatelessWidget {
                 onTap: () => _openBudgetList(context),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   child: Row(
                     children: [
                       Text(
