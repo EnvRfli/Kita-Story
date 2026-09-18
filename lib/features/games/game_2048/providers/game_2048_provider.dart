@@ -18,21 +18,6 @@ enum Game2048Status {
   error,
 }
 
-class _PendingGame2048ResultWrite {
-  _PendingGame2048ResultWrite({
-    required this.score,
-    required this.highestTile,
-    required this.movesCount,
-    required this.durationSeconds,
-  });
-
-  final int score;
-  final int highestTile;
-  final int movesCount;
-  final int durationSeconds;
-  bool resultConfirmed = false;
-}
-
 class Game2048Provider extends ChangeNotifier {
   Game2048Provider({
     required Game2048Engine engine,
@@ -106,8 +91,10 @@ class Game2048Provider extends ChangeNotifier {
   bool _celebrationPending = false;
   bool _gameOverPending = false;
   bool _isClaimingMilestones = false;
-  _PendingGame2048ResultWrite? _pendingResultWrite;
+  Game2048PendingFinalization? _pendingResultWrite;
   Future<void>? _endRunFuture;
+  Future<void>? _animationCompletionFuture;
+  bool _isEndRunRequested = false;
 
   bool get hasPendingWrite => _pendingResultWrite != null;
   bool _isElapsedRunning = false;
@@ -115,6 +102,12 @@ class Game2048Provider extends ChangeNotifier {
   late DateTime _startedAt;
 
   Future<void> newGame() async {
+    if (_pendingResultWrite != null) {
+      await retryPendingWrites();
+      if (_pendingResultWrite != null) return;
+    }
+    _endRunFuture = null;
+    _isEndRunRequested = false;
     _status = Game2048Status.loading;
     notifyListeners();
 
@@ -135,6 +128,8 @@ class Game2048Provider extends ChangeNotifier {
       _isInputLocked = false;
       _celebrationPending = false;
       _gameOverPending = false;
+      _pendingResultWrite = null;
+      _animationCompletionFuture = null;
       _startedAt = _clock();
       _resumeElapsed();
       _status = Game2048Status.playing;
@@ -145,6 +140,9 @@ class Game2048Provider extends ChangeNotifier {
   }
 
   Future<bool> restore() async {
+    _endRunFuture = null;
+    _isEndRunRequested = false;
+    _animationCompletionFuture = null;
     _status = Game2048Status.loading;
     notifyListeners();
 
@@ -177,7 +175,18 @@ class Game2048Provider extends ChangeNotifier {
       _isInputLocked = false;
       _celebrationPending = false;
       _gameOverPending = false;
+      _pendingResultWrite = snapshot.pendingFinalization;
       _startedAt = snapshot.startedAt;
+      if (_pendingResultWrite != null) {
+        _status = Game2048Status.saving;
+        notifyListeners();
+        await retryPendingWrites();
+        if (_pendingResultWrite == null) {
+          _isEndRunRequested = true;
+          _endRunFuture = Future.value();
+        }
+        return true;
+      }
       _status = _engine.hasAvailableMove(_tiles)
           ? Game2048Status.playing
           : Game2048Status.gameOver;
@@ -213,8 +222,31 @@ class Game2048Provider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> completeAnimation() async {
-    if (!_isInputLocked) return;
+  Future<void> completeAnimation() =>
+      _completeAnimation(autoFinalizeGameOver: true);
+
+  Future<void> _completeAnimation({
+    required bool autoFinalizeGameOver,
+  }) {
+    final ongoing = _animationCompletionFuture;
+    if (ongoing != null) return ongoing;
+    if (!_isInputLocked) return Future.value();
+
+    final completion = _completeAnimationCore(
+      autoFinalizeGameOver: autoFinalizeGameOver,
+    );
+    _animationCompletionFuture = completion;
+    return completion.whenComplete(() {
+      if (identical(_animationCompletionFuture, completion)) {
+        _animationCompletionFuture = null;
+      }
+    });
+  }
+
+  Future<void> _completeAnimationCore({
+    required bool autoFinalizeGameOver,
+  }) async {
+    final finishesRun = _gameOverPending;
 
     _isInputLocked = false;
     final statusAfterSave = _celebrationPending
@@ -227,8 +259,19 @@ class Game2048Provider extends ChangeNotifier {
       _gameOverPending = false;
     }
     if (statusAfterSave != Game2048Status.playing) _pauseElapsed();
-    await _saveActive(statusAfterSave);
+    final queuesFinalization =
+        finishesRun && (autoFinalizeGameOver || _isEndRunRequested);
+    if (queuesFinalization) _queuePendingResultWrite();
+    await _saveActive(
+      queuesFinalization ? Game2048Status.saving : statusAfterSave,
+    );
     await claimPendingMilestones();
+    if (finishesRun && autoFinalizeGameOver && !_isEndRunRequested) {
+      await _endRunWithStatus(
+        statusAfterSave,
+        settleAnimation: false,
+      );
+    }
   }
 
   Future<void> claimPendingMilestones() async {
@@ -287,34 +330,53 @@ class Game2048Provider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> saveAndExit() => _saveActive(_status);
+  Future<void> saveAndExit() async {
+    if (_isInputLocked || _animationCompletionFuture != null) {
+      await _completeAnimation(autoFinalizeGameOver: true);
+      return;
+    }
+    if (_endRunFuture != null && _pendingResultWrite == null) return;
+    await _saveActive(_status);
+  }
 
-  Future<void> endRun() {
+  Future<void> endRun() => _endRunWithStatus(Game2048Status.gameOver);
+
+  Future<void> _endRunWithStatus(
+    Game2048Status statusAfterSuccess, {
+    bool settleAnimation = true,
+  }) {
     final existing = _endRunFuture;
     if (existing != null) return existing;
 
-    final pending = _beginEndRun();
+    _isEndRunRequested = true;
+    final pending = _beginEndRun(
+      statusAfterSuccess,
+      settleAnimation: settleAnimation,
+    );
     _endRunFuture = pending;
     return pending;
   }
 
   Future<void> retryPendingWrites() async {
     await claimPendingMilestones();
-    if (_pendingResultWrite != null) await _flushPendingResultWrite();
+    if (_pendingResultWrite != null) {
+      await _flushPendingResultWrite(Game2048Status.gameOver);
+    }
   }
 
   Future<void> finishRun() async {
     await endRun();
   }
 
-  Future<void> _beginEndRun() async {
-    _pauseElapsed();
-    _pendingResultWrite ??= _PendingGame2048ResultWrite(
-      score: _score,
-      highestTile: _highestTile,
-      movesCount: _moveCount,
-      durationSeconds: elapsedSeconds,
-    );
+  Future<void> _beginEndRun(
+    Game2048Status statusAfterSuccess, {
+    required bool settleAnimation,
+  }) async {
+    if (settleAnimation &&
+        (_isInputLocked || _animationCompletionFuture != null)) {
+      await _completeAnimation(autoFinalizeGameOver: false);
+    }
+    _queuePendingResultWrite();
     try {
       await _storage.save(_snapshot(includeUndoHistory: true));
     } on Object {
@@ -322,10 +384,26 @@ class Game2048Provider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    await retryPendingWrites();
+    await claimPendingMilestones();
+    if (_pendingResultWrite != null) {
+      await _flushPendingResultWrite(statusAfterSuccess);
+    }
   }
 
-  Future<void> _flushPendingResultWrite() async {
+  void _queuePendingResultWrite() {
+    _pauseElapsed();
+    _pendingResultWrite ??= Game2048PendingFinalization(
+      score: _score,
+      highestTile: _highestTile,
+      movesCount: _moveCount,
+      durationSeconds: elapsedSeconds,
+      resultConfirmed: false,
+    );
+  }
+
+  Future<void> _flushPendingResultWrite(
+    Game2048Status statusAfterSuccess,
+  ) async {
     final pending = _pendingResultWrite;
     if (pending == null) return;
 
@@ -339,11 +417,18 @@ class Game2048Provider extends ChangeNotifier {
           movesCount: pending.movesCount,
           durationSeconds: pending.durationSeconds,
         );
-        pending.resultConfirmed = true;
+        _pendingResultWrite = Game2048PendingFinalization(
+          score: pending.score,
+          highestTile: pending.highestTile,
+          movesCount: pending.movesCount,
+          durationSeconds: pending.durationSeconds,
+          resultConfirmed: true,
+        );
+        await _storage.save(_snapshot(includeUndoHistory: true));
       }
       await _storage.clear();
       _pendingResultWrite = null;
-      _status = Game2048Status.gameOver;
+      _status = statusAfterSuccess;
     } on Object {
       _status = Game2048Status.error;
     }
@@ -363,6 +448,7 @@ class Game2048Provider extends ChangeNotifier {
         hasCelebrated2048: _hasCelebrated2048,
         highestMilestone: _highestMilestone,
         startedAt: _startedAt,
+        pendingFinalization: _pendingResultWrite,
       );
 
   void _pushUndoSnapshot(Game2048Snapshot snapshot) {
@@ -411,6 +497,10 @@ class Game2048Provider extends ChangeNotifier {
     _isInputLocked = false;
     _celebrationPending = false;
     _gameOverPending = false;
+    _pendingResultWrite = null;
+    _endRunFuture = null;
+    _animationCompletionFuture = null;
+    _isEndRunRequested = false;
     _isElapsedRunning = false;
     _startedAt = _clock();
     _elapsedLastResumedAt = _startedAt;

@@ -1,5 +1,40 @@
 import 'game_2048_tile.dart';
 
+class Game2048PendingFinalization {
+  const Game2048PendingFinalization({
+    required this.score,
+    required this.highestTile,
+    required this.movesCount,
+    required this.durationSeconds,
+    required this.resultConfirmed,
+  });
+
+  final int score;
+  final int highestTile;
+  final int movesCount;
+  final int durationSeconds;
+  final bool resultConfirmed;
+
+  Map<String, Object?> toJson() => {
+        'score': score,
+        'highest_tile': highestTile,
+        'moves_count': movesCount,
+        'duration_seconds': durationSeconds,
+        'result_confirmed': resultConfirmed,
+      };
+
+  factory Game2048PendingFinalization.fromJson(Map<String, dynamic> json) =>
+      Game2048PendingFinalization(
+        score: Game2048Snapshot._requiredInt(json, 'score'),
+        highestTile: Game2048Snapshot._requiredInt(json, 'highest_tile'),
+        movesCount: Game2048Snapshot._requiredInt(json, 'moves_count'),
+        durationSeconds:
+            Game2048Snapshot._requiredInt(json, 'duration_seconds'),
+        resultConfirmed:
+            Game2048Snapshot._requiredBool(json, 'result_confirmed'),
+      );
+}
+
 class Game2048Snapshot {
   static const int currentSchemaVersion = 1;
 
@@ -14,6 +49,7 @@ class Game2048Snapshot {
   final bool hasCelebrated2048;
   final int highestMilestone;
   final DateTime startedAt;
+  final Game2048PendingFinalization? pendingFinalization;
 
   Game2048Snapshot({
     required this.schemaVersion,
@@ -27,6 +63,7 @@ class Game2048Snapshot {
     required this.hasCelebrated2048,
     required this.highestMilestone,
     required this.startedAt,
+    this.pendingFinalization,
   })  : tiles = List.unmodifiable(tiles),
         undoSnapshots = List.unmodifiable(undoSnapshots) {
     if (schemaVersion != currentSchemaVersion) {
@@ -57,6 +94,7 @@ class Game2048Snapshot {
         'has_celebrated_2048': hasCelebrated2048,
         'highest_milestone': highestMilestone,
         'started_at': startedAt.toUtc().toIso8601String(),
+        'pending_finalization': pendingFinalization?.toJson(),
       };
 
   static Map<String, Object?> _tileToJson(Game2048Tile tile) => {
@@ -91,6 +129,8 @@ class Game2048Snapshot {
         hasCelebrated2048: _requiredBool(json, 'has_celebrated_2048'),
         highestMilestone: _requiredInt(json, 'highest_milestone'),
         startedAt: _requiredDateTime(json, 'started_at'),
+        pendingFinalization:
+            _pendingFinalizationFromJson(json['pending_finalization']),
       );
     } on FormatException {
       rethrow;
@@ -129,6 +169,19 @@ class Game2048Snapshot {
         _requiredInt(json, 'row'),
         _requiredInt(json, 'col'),
       ),
+    );
+  }
+
+  static Game2048PendingFinalization? _pendingFinalizationFromJson(
+    Object? value,
+  ) {
+    if (value == null) return null;
+    if (value is! Map) {
+      throw const FormatException(
+          'Pending finalization must be a JSON object.');
+    }
+    return Game2048PendingFinalization.fromJson(
+      Map<String, dynamic>.from(value),
     );
   }
 

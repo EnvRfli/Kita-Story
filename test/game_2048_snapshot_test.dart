@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 Game2048Snapshot snapshot({
   List<Game2048Snapshot> undoSnapshots = const [],
+  Game2048PendingFinalization? pendingFinalization,
 }) =>
     Game2048Snapshot(
       schemaVersion: 1,
@@ -25,9 +26,38 @@ Game2048Snapshot snapshot({
       hasCelebrated2048: false,
       highestMilestone: 128,
       startedAt: DateTime.utc(2026, 9, 17),
+      pendingFinalization: pendingFinalization,
     );
 
 void main() {
+  test('snapshot round trip preserves pending finalization', () {
+    final value = snapshot(
+      pendingFinalization: const Game2048PendingFinalization(
+        score: 900,
+        highestTile: 128,
+        movesCount: 17,
+        durationSeconds: 31,
+        resultConfirmed: true,
+      ),
+    );
+
+    final json = value.toJson();
+    final restored = Game2048Snapshot.fromJson(json);
+
+    expect(json['pending_finalization'], {
+      'score': 900,
+      'highest_tile': 128,
+      'moves_count': 17,
+      'duration_seconds': 31,
+      'result_confirmed': true,
+    });
+    expect(restored.pendingFinalization?.score, 900);
+    expect(restored.pendingFinalization?.highestTile, 128);
+    expect(restored.pendingFinalization?.movesCount, 17);
+    expect(restored.pendingFinalization?.durationSeconds, 31);
+    expect(restored.pendingFinalization?.resultConfirmed, isTrue);
+  });
+
   test('snapshot round trip preserves board undo and celebration state', () {
     final undoSnapshot = snapshot();
     final currentSnapshot = snapshot(undoSnapshots: [undoSnapshot]);
