@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -34,6 +35,13 @@ class _Game2048BoardState extends State<Game2048Board> {
   bool _didDispatchSwipe = false;
   Set<int> _previousTileIds = <int>{};
   Set<int> _spawnedTileIds = <int>{};
+  List<Game2048Tile> _mergeSourceTiles = const [];
+  Map<int, Game2048Position> _mergeDestinations = const {};
+  Set<int> _hiddenMergeResultIds = <int>{};
+  Timer? _mergePhaseTimer;
+  var _mergeAnimationGeneration = 0;
+  var _moveMergeSources = false;
+  var _disableAnimations = false;
 
   @override
   void initState() {
@@ -42,19 +50,42 @@ class _Game2048BoardState extends State<Game2048Board> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (_disableAnimations && _mergeSourceTiles.isNotEmpty) {
+      _cancelMergeAnimation();
+      _clearMergeVisuals();
+    }
+  }
+
+  @override
   void didUpdateWidget(Game2048Board oldWidget) {
     super.didUpdateWidget(oldWidget);
     final currentIds = widget.tiles.map((tile) => tile.id).toSet();
     _spawnedTileIds = currentIds.difference(_previousTileIds);
     _previousTileIds = currentIds;
+
+    if (widget.merges.isEmpty && oldWidget.merges.isNotEmpty) {
+      _cancelMergeAnimation();
+      _clearMergeVisuals();
+    } else if (widget.merges.isNotEmpty &&
+        !_sameMergeBatch(widget.merges, oldWidget.merges)) {
+      _startMergeAnimation(oldWidget.tiles);
+    }
+  }
+
+  @override
+  void dispose() {
+    _cancelMergeAnimation();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final disableAnimations = MediaQuery.of(context).disableAnimations;
-    final mergedTileIds = widget.merges
-        .map((merge) => merge.resultTileId)
-        .toSet();
+    final mergedTileIds =
+        widget.merges.map((merge) => merge.resultTileId).toSet();
     final movingTileIds = widget.transitions
         .where((transition) => transition.from != transition.to)
         .map((transition) => transition.tileId)
@@ -74,9 +105,8 @@ class _Game2048BoardState extends State<Game2048Board> {
       onPanEnd: (_) => _dispatchSwipeIfNeeded(),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final availableWidth = constraints.maxWidth.isFinite
-              ? constraints.maxWidth
-              : 440.0;
+          final availableWidth =
+              constraints.maxWidth.isFinite ? constraints.maxWidth : 440.0;
           final boardSize = math.min(availableWidth, 440.0);
           final padding = boardSize * 0.03;
           final gap = boardSize * 0.025;
@@ -103,16 +133,30 @@ class _Game2048BoardState extends State<Game2048Board> {
                         child: Game2048BoardCell(row: row, col: col),
                       ),
                   for (final tile in widget.tiles)
+                    if (!_hiddenMergeResultIds.contains(tile.id))
+                      Game2048TileWidget(
+                        key: ValueKey('2048-tile-${tile.id}'),
+                        tile: tile,
+                        left: padding + tile.position.col * (tileSize + gap),
+                        top: padding + tile.position.row * (tileSize + gap),
+                        size: tileSize,
+                        disableAnimations: _disableAnimations,
+                        isMoving: movingTileIds.contains(tile.id),
+                        isMerged: mergedTileIds.contains(tile.id),
+                        isSpawned: _spawnedTileIds.contains(tile.id),
+                        animationDuration: widget.animationDuration,
+                      ),
+                  for (final tile in _mergeSourceTiles)
                     Game2048TileWidget(
                       key: ValueKey('2048-tile-${tile.id}'),
                       tile: tile,
-                      left: padding + tile.position.col * (tileSize + gap),
-                      top: padding + tile.position.row * (tileSize + gap),
+                      left: padding +
+                          (_mergeSourcePosition(tile).col) * (tileSize + gap),
+                      top: padding +
+                          (_mergeSourcePosition(tile).row) * (tileSize + gap),
                       size: tileSize,
-                      disableAnimations: disableAnimations,
-                      isMoving: movingTileIds.contains(tile.id),
-                      isMerged: mergedTileIds.contains(tile.id),
-                      isSpawned: _spawnedTileIds.contains(tile.id),
+                      disableAnimations: _disableAnimations,
+                      isMoving: _moveMergeSources,
                       animationDuration: widget.animationDuration,
                     ),
                 ],
@@ -122,6 +166,99 @@ class _Game2048BoardState extends State<Game2048Board> {
         },
       ),
     );
+  }
+
+  Game2048Position _mergeSourcePosition(Game2048Tile tile) => _moveMergeSources
+      ? _mergeDestinations[tile.id] ?? tile.position
+      : tile.position;
+
+  void _startMergeAnimation(List<Game2048Tile> previousTiles) {
+    _cancelMergeAnimation();
+
+    final previousById = {
+      for (final tile in previousTiles) tile.id: tile,
+    };
+    final transitionById = {
+      for (final transition in widget.transitions)
+        transition.tileId: transition,
+    };
+    final sourceTiles = <Game2048Tile>[];
+    final destinations = <int, Game2048Position>{};
+
+    for (final merge in widget.merges) {
+      for (final sourceId in merge.sourceTileIds) {
+        final source = previousById[sourceId];
+        if (source == null) continue;
+        final transition = transitionById[sourceId];
+        sourceTiles.add(
+          source.copyWith(position: transition?.from ?? source.position),
+        );
+        destinations[sourceId] = transition?.to ?? merge.position;
+      }
+    }
+
+    if (_disableAnimations ||
+        widget.animationDuration == Duration.zero ||
+        sourceTiles.isEmpty) {
+      _clearMergeVisuals();
+      return;
+    }
+
+    _mergeSourceTiles = sourceTiles;
+    _mergeDestinations = destinations;
+    _hiddenMergeResultIds = {
+      for (final merge in widget.merges) merge.resultTileId,
+    };
+    _moveMergeSources = false;
+    final generation = _mergeAnimationGeneration;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _mergeAnimationGeneration) return;
+      setState(() => _moveMergeSources = true);
+      _mergePhaseTimer = Timer(widget.animationDuration, () {
+        if (!mounted || generation != _mergeAnimationGeneration) return;
+        setState(_clearMergeVisuals);
+      });
+    });
+  }
+
+  void _cancelMergeAnimation() {
+    _mergeAnimationGeneration++;
+    _mergePhaseTimer?.cancel();
+    _mergePhaseTimer = null;
+  }
+
+  void _clearMergeVisuals() {
+    _mergeSourceTiles = const [];
+    _mergeDestinations = const {};
+    _hiddenMergeResultIds = <int>{};
+    _moveMergeSources = false;
+  }
+
+  static bool _sameMergeBatch(
+    List<Game2048Merge> current,
+    List<Game2048Merge> previous,
+  ) {
+    if (current.length != previous.length) return false;
+    for (var index = 0; index < current.length; index++) {
+      final a = current[index];
+      final b = previous[index];
+      if (a.resultTileId != b.resultTileId ||
+          a.value != b.value ||
+          a.position != b.position ||
+          !_sameIds(a.sourceTileIds, b.sourceTileIds)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static bool _sameIds(List<int> current, List<int> previous) {
+    if (current.length != previous.length) return false;
+    for (var index = 0; index < current.length; index++) {
+      if (current[index] != previous[index]) return false;
+    }
+    return true;
   }
 
   void _dispatchSwipeIfNeeded() {
@@ -137,9 +274,7 @@ class _Game2048BoardState extends State<Game2048Board> {
       return;
     }
     widget.onSwipe(
-      _panOffset.dy.isNegative
-          ? Game2048Direction.up
-          : Game2048Direction.down,
+      _panOffset.dy.isNegative ? Game2048Direction.up : Game2048Direction.down,
     );
   }
 }
