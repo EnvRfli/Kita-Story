@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kita_story/features/games/game_2048/engine/game_2048_engine.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_move.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_snapshot.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_tile.dart';
-import 'package:kita_story/features/games/game_2048/providers/game_2048_provider.dart';
-import 'package:kita_story/features/games/game_2048/repositories/game_2048_repository.dart';
-import 'package:kita_story/features/games/game_2048/services/game_2048_local_storage.dart';
+import 'package:kita_story/features/games/2048/engine/game_2048_engine.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_move.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_snapshot.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_tile.dart';
+import 'package:kita_story/features/games/2048/providers/game_2048_provider.dart';
+import 'package:kita_story/features/games/2048/repositories/game_2048_repository.dart';
+import 'package:kita_story/features/games/2048/services/game_2048_local_storage.dart';
 
 Game2048Tile tile(int id, int value) => Game2048Tile(
       id: id,

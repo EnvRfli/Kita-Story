@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_snapshot.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_tile.dart';
-import 'package:kita_story/features/games/game_2048/services/game_2048_local_storage.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_snapshot.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_tile.dart';
+import 'package:kita_story/features/games/2048/services/game_2048_local_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Game2048Snapshot snapshot({

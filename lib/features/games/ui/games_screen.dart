@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kita_story/features/games/game_2048/ui/game_2048_start_screen.dart';
+import 'package:kita_story/features/games/2048/ui/game_2048_start_screen.dart';
 import 'package:kita_story/features/games/sudoku/ui/sudoku_start_screen.dart';
 
 class _GameItem {

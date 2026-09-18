@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kita_story/features/games/game_2048/repositories/game_2048_repository.dart';
+import 'package:kita_story/features/games/2048/repositories/game_2048_repository.dart';
 
 void main() {
   group('Game2048Repository', () {
@@ -122,6 +122,33 @@ void main() {
       );
       expect(Game2048Repository.rewardPointsFor(32768), 50);
       expect(Game2048Repository.rewardPointsFor(300), isNull);
+    });
+
+    test('filters out non-positive scores from leaderboard', () {
+      final entries = [
+        Game2048LeaderboardEntry(
+          userId: 'valid',
+          userName: 'Valid',
+          score: 100,
+          highestTile: 16,
+          movesCount: 20,
+          durationSeconds: 60,
+          completedAt: DateTime.utc(2026, 9, 17),
+        ),
+        Game2048LeaderboardEntry(
+          userId: 'zero',
+          userName: 'Zero',
+          score: 0,
+          highestTile: 2,
+          movesCount: 0,
+          durationSeconds: 5,
+          completedAt: DateTime.utc(2026, 9, 17),
+        ),
+      ];
+
+      final sorted = Game2048Repository.sortLeaderboard(entries);
+      expect(sorted, hasLength(1));
+      expect(sorted.first.userId, 'valid');
     });
   });
 }

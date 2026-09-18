@@ -1,9 +1,9 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kita_story/features/games/game_2048/engine/game_2048_engine.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_move.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_tile.dart';
+import 'package:kita_story/features/games/2048/engine/game_2048_engine.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_move.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_tile.dart';
 
 List<Game2048Tile> row(List<int> values) => [
       for (var col = 0; col < values.length; col++)

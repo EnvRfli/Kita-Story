@@ -2,19 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kita_story/features/games/game_2048/engine/game_2048_engine.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_move.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_snapshot.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_tile.dart';
-import 'package:kita_story/features/games/game_2048/providers/game_2048_provider.dart';
-import 'package:kita_story/features/games/game_2048/repositories/game_2048_repository.dart';
-import 'package:kita_story/features/games/game_2048/services/game_2048_local_storage.dart';
-import 'package:kita_story/features/games/game_2048/ui/game_2048_screen.dart';
-import 'package:kita_story/features/games/game_2048/ui/game_2048_start_screen.dart';
-import 'package:kita_story/features/games/game_2048/utils/game_2048_formatters.dart';
-import 'package:kita_story/features/games/game_2048/widgets/game_2048_board.dart';
-import 'package:kita_story/features/games/game_2048/widgets/game_2048_history_bottom_sheet.dart';
-import 'package:kita_story/features/games/game_2048/widgets/game_2048_tile_widget.dart';
+import 'package:kita_story/features/games/2048/engine/game_2048_engine.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_move.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_snapshot.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_tile.dart';
+import 'package:kita_story/features/games/2048/providers/game_2048_provider.dart';
+import 'package:kita_story/features/games/2048/repositories/game_2048_repository.dart';
+import 'package:kita_story/features/games/2048/services/game_2048_local_storage.dart';
+import 'package:kita_story/features/games/2048/ui/game_2048_screen.dart';
+import 'package:kita_story/features/games/2048/ui/game_2048_start_screen.dart';
+import 'package:kita_story/features/games/2048/utils/game_2048_formatters.dart';
+import 'package:kita_story/features/games/2048/widgets/game_2048_board.dart';
+import 'package:kita_story/features/games/2048/widgets/game_2048_history_bottom_sheet.dart';
+import 'package:kita_story/features/games/2048/widgets/game_2048_tile_widget.dart';
 import 'package:kita_story/features/games/ui/games_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -543,6 +543,30 @@ void main() {
     await tester.drag(find.byType(Game2048Board), const Offset(120, 72));
 
     expect(directions, [Game2048Direction.right]);
+  });
+
+  testWidgets('dispatches swipe when dragged outside the board', (
+    WidgetTester tester,
+  ) async {
+    final provider = Game2048Provider(
+      engine: _WidgetScriptedEngine(
+        initialTiles: [_screenTile(1, 2), _screenTile(2, 2)],
+        results: [
+          _screenResult(tiles: [_screenTile(3, 4)], scoreGained: 4),
+        ],
+      ),
+      storage: _WidgetMemoryStorage(),
+      repository: _WidgetRepository(),
+    );
+    await provider.newGame();
+    await tester.pumpWidget(_screenHarness(provider));
+    await tester.pumpAndSettle();
+
+    // Drag from the score area (above the board) downwards
+    await tester.drag(find.text('Skor'), const Offset(0, 100));
+    await tester.pumpAndSettle();
+
+    expect(provider.moveCount, 1);
   });
 
   test('maps every standard tile value through 65536 to a solid color', () {

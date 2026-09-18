@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_move.dart';
-import 'package:kita_story/features/games/game_2048/models/game_2048_tile.dart';
-import 'package:kita_story/features/games/game_2048/widgets/game_2048_board.dart';
-import 'package:kita_story/features/games/game_2048/widgets/game_2048_tile_widget.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_move.dart';
+import 'package:kita_story/features/games/2048/models/game_2048_tile.dart';
+import 'package:kita_story/features/games/2048/widgets/game_2048_board.dart';
+import 'package:kita_story/features/games/2048/widgets/game_2048_tile_widget.dart';
 
 const _animationDuration = Duration(milliseconds: 100);
 const _initialTiles = [

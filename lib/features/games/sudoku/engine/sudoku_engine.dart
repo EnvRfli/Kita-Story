@@ -178,13 +178,15 @@ class SudokuEngine {
   bool isValidEntry(List<List<SudokuCell>> grid, int row, int col, int num) {
     // Check row
     for (int i = 0; i < _size; i++) {
-      if (i != col && !grid[row][i].hasError && grid[row][i].value == num)
+      if (i != col && !grid[row][i].hasError && grid[row][i].value == num) {
         return false;
+      }
     }
     // Check column
     for (int i = 0; i < _size; i++) {
-      if (i != row && !grid[i][col].hasError && grid[i][col].value == num)
+      if (i != row && !grid[i][col].hasError && grid[i][col].value == num) {
         return false;
+      }
     }
     // Check 3x3 block
     int startRow = row - row % 3;
@@ -195,7 +197,9 @@ class SudokuEngine {
         int c = j + startCol;
         if ((r != row || c != col) &&
             !grid[r][c].hasError &&
-            grid[r][c].value == num) return false;
+            grid[r][c].value == num) {
+          return false;
+        }
       }
     }
     return true;
