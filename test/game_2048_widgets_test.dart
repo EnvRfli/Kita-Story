@@ -15,6 +15,7 @@ import 'package:kita_story/features/games/game_2048/utils/game_2048_formatters.d
 import 'package:kita_story/features/games/game_2048/widgets/game_2048_board.dart';
 import 'package:kita_story/features/games/game_2048/widgets/game_2048_history_bottom_sheet.dart';
 import 'package:kita_story/features/games/game_2048/widgets/game_2048_tile_widget.dart';
+import 'package:kita_story/features/games/ui/games_screen.dart';
 import 'package:provider/provider.dart';
 
 const _tiles = [
@@ -273,6 +274,26 @@ Game2048LeaderboardEntry _leaderboardEntry({
     );
 
 void main() {
+  testWidgets('2048 card opens the playable start screen', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GamesScreen()));
+
+    await tester.tap(find.text('2048'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(Game2048StartScreen), findsOneWidget);
+    expect(find.text('Sedang Dikembangkan'), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(find.text('Minesweeper'));
+    await tester.tap(find.text('Minesweeper'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Sedang Dikembangkan'), findsOneWidget);
+  });
+
   test('formats 2048 scores with Indonesian separators', () {
     expect(format2048Score(11248), '11.248');
   });
