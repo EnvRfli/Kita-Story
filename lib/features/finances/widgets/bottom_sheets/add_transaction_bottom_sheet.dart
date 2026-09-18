@@ -9,15 +9,18 @@ import 'add_category_dialog.dart';
 
 class AddTransactionBottomSheet extends StatefulWidget {
   final TransactionModel? transactionToEdit;
+  final String? initialType;
 
   const AddTransactionBottomSheet({
     super.key,
     this.transactionToEdit,
+    this.initialType,
   });
 
   static Future<void> show(
     BuildContext context, {
     TransactionModel? transactionToEdit,
+    String? initialType,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -25,6 +28,7 @@ class AddTransactionBottomSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (ctx) => AddTransactionBottomSheet(
         transactionToEdit: transactionToEdit,
+        initialType: initialType,
       ),
     );
   }
@@ -52,9 +56,10 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
     final item = widget.transactionToEdit;
     _titleController = TextEditingController(text: item?.title ?? '');
     _amountController = TextEditingController(
-      text: item != null ? _formatRawNumber(item.amount.round().toString()) : '',
+      text:
+          item != null ? _formatRawNumber(item.amount.round().toString()) : '',
     );
-    _selectedType = item?.type ?? 'expense';
+    _selectedType = item?.type ?? widget.initialType ?? 'expense';
     _selectedCategory = item?.category;
     _selectedDate = item?.transactionDate ?? DateTime.now();
 
@@ -206,318 +211,321 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
                       ),
                     ),
                   ),
-              const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-              // 2. Header Title
-              Text(
-                isEditing ? 'Ubah Transaksi' : 'Keuangan',
-                style: const TextStyle(
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1E293B),
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Divider(height: 1, color: Color(0xFFF1F5F9)),
-              const SizedBox(height: 16),
-
-              // 3. Jenis Transaksi (Toggle Chips)
-              const Text(
-                'Jenis Transaksi',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _buildTypeToggleChip(
-                    label: 'Pemasukan',
-                    type: 'income',
-                  ),
-                  const SizedBox(width: 10),
-                  _buildTypeToggleChip(
-                    label: 'Pengeluaran',
-                    type: 'expense',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // 4. Judul Transaksi
-              const Text(
-                'Judul Transaksi',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _titleController,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1E293B),
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Masukkan judul transaksi',
-                  hintStyle: const TextStyle(
-                    fontSize: 13.5,
-                    color: Color(0xFF94A3B8),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide:
-                        const BorderSide(color: Color(0xFFFF7A00), width: 1.5),
-                  ),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Judul transaksi tidak boleh kosong';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // 5. Kategori Chips + Add Custom Category Button
-              const Text(
-                'Kategori',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ...categories.map((catName) {
-                    final isSelected = _selectedCategory == catName;
-                    return InkWell(
-                      onTap: () {
-                        setState(() => _selectedCategory = catName);
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 9),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? const Color(0xFFFF7A00)
-                              : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? const Color(0xFFFF7A00)
-                                : Colors.transparent,
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Text(
-                          catName,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w600,
-                            color: isSelected
-                                ? Colors.white
-                                : const Color(0xFF334155),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-
-                  // Plus button for custom category
-                  InkWell(
-                    onTap: () {
-                      AddCategoryDialog.show(
-                        context,
-                        isExpense: _selectedType == 'expense',
-                        onCategoryAdded: (newCategory) async {
-                          await provider.addCustomCategory(
-                            newCategory,
-                            isExpense: _selectedType == 'expense',
-                          );
-                          setState(() => _selectedCategory = newCategory);
-                        },
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 9),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.add_rounded,
-                        color: Color(0xFF64748B),
-                        size: 19,
-                      ),
+                  // 2. Header Title
+                  Text(
+                    isEditing ? 'Ubah Transaksi' : 'Keuangan',
+                    style: const TextStyle(
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E293B),
+                      letterSpacing: -0.2,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  const SizedBox(height: 16),
 
-              // 6. Jumlah Transaksi (Formatted Currency)
-              const Text(
-                'Jumlah Transaksi',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFE2E8F0),
-                    width: 1.2,
+                  // 3. Jenis Transaksi (Toggle Chips)
+                  const Text(
+                    'Jenis Transaksi',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E293B),
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _buildTypeToggleChip(
+                        label: 'Pemasukan',
+                        type: 'income',
+                      ),
+                      const SizedBox(width: 10),
+                      _buildTypeToggleChip(
+                        label: 'Pengeluaran',
+                        type: 'expense',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 4. Judul Transaksi
+                  const Text(
+                    'Judul Transaksi',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _titleController,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Masukkan judul transaksi',
+                      hintStyle: const TextStyle(
+                        fontSize: 13.5,
+                        color: Color(0xFF94A3B8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 13),
-                      child: const Text(
-                        'Rp',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1E293B),
-                        ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                            color: Color(0xFFFF7A00), width: 1.5),
                       ),
                     ),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _amountController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        onChanged: (val) {
-                          final formatted = _formatRawNumber(val);
-                          if (formatted != val) {
-                            _amountController.value = TextEditingValue(
-                              text: formatted,
-                              selection: TextSelection.collapsed(
-                                  offset: formatted.length),
-                            );
-                          }
-                        },
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1E293B),
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: '0',
-                          hintStyle: TextStyle(
-                            fontSize: 15,
-                            color: Color(0xFF94A3B8),
-                            fontWeight: FontWeight.normal,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 13),
-                        ),
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty || val == '0') {
-                            return 'Masukkan jumlah transaksi yang valid';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'Judul transaksi tidak boleh kosong';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
 
-              // 7. Simpan Button
-              Container(
-                width: double.infinity,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0088FF), Color(0xFF0775D5)],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0088FF).withValues(alpha: 0.30),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+                  // 5. Kategori Chips + Add Custom Category Button
+                  const Text(
+                    'Kategori',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E293B),
                     ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _isSaving ? null : _handleSave,
-                    borderRadius: BorderRadius.circular(14),
-                    child: Center(
-                      child: _isSaving
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ...categories.map((catName) {
+                        final isSelected = _selectedCategory == catName;
+                        return InkWell(
+                          onTap: () {
+                            setState(() => _selectedCategory = catName);
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 9),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? const Color(0xFFFF7A00)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? const Color(0xFFFF7A00)
+                                    : Colors.transparent,
+                                width: 1.2,
                               ),
-                            )
-                          : const Text(
-                              'Simpan',
-                              style: TextStyle(
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                height: 1.1,
-                              ),
-                              textAlign: TextAlign.center,
                             ),
+                            child: Text(
+                              catName,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : const Color(0xFF334155),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+
+                      // Plus button for custom category
+                      InkWell(
+                        onTap: () {
+                          AddCategoryDialog.show(
+                            context,
+                            isExpense: _selectedType == 'expense',
+                            onCategoryAdded: (newCategory) async {
+                              await provider.addCustomCategory(
+                                newCategory,
+                                isExpense: _selectedType == 'expense',
+                              );
+                              setState(() => _selectedCategory = newCategory);
+                            },
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.add_rounded,
+                            color: Color(0xFF64748B),
+                            size: 19,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 6. Jumlah Transaksi (Formatted Currency)
+                  const Text(
+                    'Jumlah Transaksi',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E293B),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFFE2E8F0),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 13),
+                          child: const Text(
+                            'Rp',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _amountController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            onChanged: (val) {
+                              final formatted = _formatRawNumber(val);
+                              if (formatted != val) {
+                                _amountController.value = TextEditingValue(
+                                  text: formatted,
+                                  selection: TextSelection.collapsed(
+                                      offset: formatted.length),
+                                );
+                              }
+                            },
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1E293B),
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: '0',
+                              hintStyle: TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF94A3B8),
+                                fontWeight: FontWeight.normal,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 13),
+                            ),
+                            validator: (val) {
+                              if (val == null ||
+                                  val.trim().isEmpty ||
+                                  val == '0') {
+                                return 'Masukkan jumlah transaksi yang valid';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 7. Simpan Button
+                  Container(
+                    width: double.infinity,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0088FF), Color(0xFF0775D5)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              const Color(0xFF0088FF).withValues(alpha: 0.30),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _isSaving ? null : _handleSave,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Center(
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'Simpan',
+                                  style: TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    height: 1.1,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
         ),
       ),
-    ),
-  ),
-);
-}
+    );
+  }
 
   Widget _buildTypeToggleChip({
     required String label,
@@ -538,14 +546,11 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isSelected
-                ? const Color(0xFFFF7A00)
-                : const Color(0xFFF1F5F9),
+            color:
+                isSelected ? const Color(0xFFFF7A00) : const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isSelected
-                  ? const Color(0xFFFF7A00)
-                  : Colors.transparent,
+              color: isSelected ? const Color(0xFFFF7A00) : Colors.transparent,
               width: 1.2,
             ),
           ),

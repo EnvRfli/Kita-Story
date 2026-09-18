@@ -6,22 +6,27 @@ import '../models/finance_filter_model.dart';
 import '../providers/finance_provider.dart';
 import '../widgets/finance_balance_card.dart';
 import '../widgets/finance_summary_row.dart';
-import '../widgets/finance_category_donut_chart.dart';
+import '../widgets/finance_expense_carousel.dart';
 import '../widgets/transaction_card.dart';
 import '../widgets/bottom_sheets/add_transaction_bottom_sheet.dart';
 import '../widgets/bottom_sheets/finance_filter_bottom_sheet.dart';
 import '../widgets/bottom_sheets/transaction_detail_bottom_sheet.dart';
 
+import 'dart:async';
+import '../../../core/services/finance_widget_service.dart';
+
 class FinanceScreen extends StatefulWidget {
   final String? targetUserId;
   final String? partnerName;
   final bool isPartnerMode;
+  final String? initialAction;
 
   const FinanceScreen({
     super.key,
     this.targetUserId,
     this.partnerName,
     this.isPartnerMode = false,
+    this.initialAction,
   });
 
   @override
@@ -30,26 +35,69 @@ class FinanceScreen extends StatefulWidget {
 
 class _FinanceScreenState extends State<FinanceScreen> {
   FinanceFilterModel _mainFilter = const FinanceFilterModel();
+  StreamSubscription<String>? _widgetActionSubscription;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
+    FinanceWidgetService.initialize();
+    _widgetActionSubscription =
+        FinanceWidgetService.onWidgetAction.listen((action) {
+      if (!mounted) return;
+      _handleAction(action);
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _loadData();
+      final action = widget.initialAction ??
+          await FinanceWidgetService.getInitialAction();
+      if (action != null && mounted) {
+        _handleAction(action);
+      }
+    });
+  }
+
+  void _handleAction(String action) {
+    if (action == 'add_income') {
+      _openAddTransaction(initialType: 'income');
+    } else if (action == 'add_expense') {
+      _openAddTransaction(initialType: 'expense');
+    }
+  }
+
+  @override
+  void dispose() {
+    _widgetActionSubscription?.cancel();
+    super.dispose();
   }
 
   void _loadData() {
     final auth = context.read<AuthProvider>();
     final uid = widget.targetUserId ?? auth.currentUserProfile?.id;
+    final partnerId = auth.currentUserProfile?.partnerId;
 
-    context.read<FinanceProvider>().fetchTransactions(
+    final financeProvider = context.read<FinanceProvider>();
+    financeProvider.fetchTransactions(
           targetUserId: uid,
+        );
+    financeProvider.fetchBudgets(
+          targetUserId: uid,
+          partnerId: partnerId,
         );
   }
 
-  void _openAddTransaction() {
-    AddTransactionBottomSheet.show(context);
+  bool _isModalOpen = false;
+
+  void _openAddTransaction({String? initialType}) async {
+    if (_isModalOpen) {
+      Navigator.of(context, rootNavigator: true).pop();
+      _isModalOpen = false;
+      await Future.delayed(const Duration(milliseconds: 120));
+    }
+    if (!mounted) return;
+    _isModalOpen = true;
+    await AddTransactionBottomSheet.show(context, initialType: initialType);
+    _isModalOpen = false;
   }
 
   void _openFilterBottomSheet() {
@@ -194,10 +242,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
                       // A. Saldo Keseluruhan Card (Purple Gradient 3D)
                       FinanceBalanceCard(
                         totalBalance: provider.totalBalance,
-                        netSavings: provider.currentMonthNetSavings,
+                        netSavings: provider.totalMonthlyBudgetRemaining(
+                            currentUserId: myUid),
                         isBalanceVisible: provider.isBalanceVisible,
                         onToggleVisibility: () =>
                             provider.toggleBalanceVisibility(),
+                        subtitleLabel: 'Sisa bulan ini',
+                        showPlusSign: false,
                       ),
                       const SizedBox(height: 16),
 
@@ -209,9 +260,14 @@ class _FinanceScreenState extends State<FinanceScreen> {
                       ),
                       const SizedBox(height: 18),
 
-                      // C. Kategori Pengeluaran Donut Chart
-                      FinanceCategoryDonutChart(
+                      // C. Kategori Pengeluaran & Budget Carousel
+                      FinanceExpenseCarousel(
                         breakdown: provider.categoryExpenseBreakdown,
+                        budgetProgressList:
+                            provider.getBudgetProgressList(currentUserId: myUid),
+                        targetUserId: widget.targetUserId,
+                        partnerName: widget.partnerName,
+                        isPartnerMode: isPartner,
                       ),
                       const SizedBox(height: 22),
 

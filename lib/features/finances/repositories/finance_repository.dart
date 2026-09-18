@@ -4,6 +4,7 @@ import '../../../core/network/supabase_client.dart';
 import '../../../core/services/activity_log_service.dart';
 import '../models/transaction_model.dart';
 import '../models/finance_filter_model.dart';
+import '../models/finance_budget_model.dart';
 
 class FinanceRepository {
   final _client = SupabaseNetwork.client;
@@ -270,5 +271,182 @@ class FinanceRepository {
   /// Delete a transaction
   Future<void> deleteTransaction(String transactionId) async {
     await _client.from('transactions').delete().eq('id', transactionId);
+  }
+
+  // ===========================================================================
+  // BUDGETS MODULE METHODS
+  // ===========================================================================
+
+  /// Fetch active budgets for user (including shared budgets with partner)
+  Future<List<FinanceBudgetModel>> getBudgets({
+    String? targetUserId,
+    String? partnerId,
+  }) async {
+    final user = _client.auth.currentUser;
+    final uid = targetUserId ?? user?.id;
+    if (uid == null) return [];
+
+    try {
+      // Query budgets where user_id = uid, or shared with partner
+      var query = _client.from('finance_budgets').select();
+
+      final List response;
+      if (partnerId != null && partnerId.isNotEmpty) {
+        response = await query.or(
+          'user_id.eq.$uid,and(is_shared.eq.true,or(user_id.eq.$partnerId,partner_id.eq.$uid))',
+        ).order('created_at', ascending: false);
+      } else {
+        response = await query.eq('user_id', uid).order('created_at', ascending: false);
+      }
+
+      final budgets = response
+          .map((json) => FinanceBudgetModel.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      // Check auto-renew rollover for all budgets
+      final List<FinanceBudgetModel> updatedList = [];
+      for (final b in budgets) {
+        final rolled = b.checkAndRollover();
+        if (rolled.startDate != b.startDate || rolled.endDate != b.endDate) {
+          // Persist rollover to database in background
+          _client.from('finance_budgets').update({
+            'start_date': '${rolled.startDate.year.toString().padLeft(4, '0')}-${rolled.startDate.month.toString().padLeft(2, '0')}-${rolled.startDate.day.toString().padLeft(2, '0')}',
+            'end_date': '${rolled.endDate.year.toString().padLeft(4, '0')}-${rolled.endDate.month.toString().padLeft(2, '0')}-${rolled.endDate.day.toString().padLeft(2, '0')}',
+            'alert_80_notified': false,
+            'alert_100_notified': false,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          }).eq('id', b.id).then((_) {}, onError: (err) {
+            debugPrint('Error syncing budget rollover to DB: $err');
+          });
+          updatedList.add(rolled);
+        } else {
+          updatedList.add(b);
+        }
+      }
+
+      return updatedList;
+    } catch (e) {
+      debugPrint('Error fetching budgets: $e');
+      rethrow;
+    }
+  }
+
+  /// Create a new budget and award +5 gamification points
+  Future<FinanceBudgetModel> createBudget({
+    required String category,
+    required double amount,
+    required String periodType,
+    required DateTime startDate,
+    required DateTime endDate,
+    String repeatType = 'auto_renew',
+    int monthlyStartDay = 1,
+    bool isShared = false,
+    String? partnerId,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Pengguna belum login');
+
+    final payload = <String, dynamic>{
+      'user_id': user.id,
+      if (partnerId != null) 'partner_id': partnerId,
+      'is_shared': isShared,
+      'category': category.trim(),
+      'amount': amount,
+      'period_type': periodType,
+      'start_date': '${startDate.year.toString().padLeft(4, '0')}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}',
+      'end_date': '${endDate.year.toString().padLeft(4, '0')}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}',
+      'repeat_type': repeatType,
+      'monthly_start_day': monthlyStartDay,
+      'alert_80_notified': false,
+      'alert_100_notified': false,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    final response = await _client
+        .from('finance_budgets')
+        .insert(payload)
+        .select()
+        .single();
+
+    final newBudget = FinanceBudgetModel.fromJson(response);
+    final formattedNominal = _formatRupiah(amount);
+
+    // Gamification & Points Ledger (+5 for adding new budget)
+    try {
+      await ActivityLogService.recordActivityAndAddPoints(
+        userId: user.id,
+        points: 5,
+        activityType: 'add_budget',
+        title: 'Menambah Budget Baru 🎯',
+        description: isShared
+            ? 'Menetapkan budget bersama "$category" ($formattedNominal)'
+            : 'Menetapkan budget "$category" ($formattedNominal)',
+        referenceId: newBudget.id,
+      );
+    } catch (logError) {
+      debugPrint('Warning recording finance budget gamification activity: $logError');
+    }
+
+    return newBudget;
+  }
+
+  /// Update an existing budget
+  Future<FinanceBudgetModel> updateBudget(
+    String budgetId, {
+    required String category,
+    required double amount,
+    required String periodType,
+    required DateTime startDate,
+    required DateTime endDate,
+    String repeatType = 'auto_renew',
+    int monthlyStartDay = 1,
+    bool isShared = false,
+    String? partnerId,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Pengguna belum login');
+
+    final payload = <String, dynamic>{
+      if (partnerId != null) 'partner_id': partnerId,
+      'is_shared': isShared,
+      'category': category.trim(),
+      'amount': amount,
+      'period_type': periodType,
+      'start_date': '${startDate.year.toString().padLeft(4, '0')}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}',
+      'end_date': '${endDate.year.toString().padLeft(4, '0')}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}',
+      'repeat_type': repeatType,
+      'monthly_start_day': monthlyStartDay,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    final response = await _client
+        .from('finance_budgets')
+        .update(payload)
+        .eq('id', budgetId)
+        .select()
+        .single();
+
+    return FinanceBudgetModel.fromJson(response);
+  }
+
+  /// Update notification alert flags to avoid re-triggering notifications in same cycle
+  Future<void> updateBudgetNotificationFlags(
+    String budgetId, {
+    bool? alert80,
+    bool? alert100,
+  }) async {
+    final payload = <String, dynamic>{
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    if (alert80 != null) payload['alert_80_notified'] = alert80;
+    if (alert100 != null) payload['alert_100_notified'] = alert100;
+
+    await _client.from('finance_budgets').update(payload).eq('id', budgetId);
+  }
+
+  /// Delete a budget
+  Future<void> deleteBudget(String budgetId) async {
+    await _client.from('finance_budgets').delete().eq('id', budgetId);
   }
 }

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:kita_story/features/books/providers/book_provider.dart';
+import 'package:kita_story/core/widgets/bouncy_filter_chip.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../models/book_model.dart';
 import '../repositories/book_repository.dart';
-import '../providers/book_provider.dart';
 import '../widgets/widgets.dart';
 
 class BookListScreen extends StatefulWidget {
@@ -407,7 +407,7 @@ class _BookListScreenState extends State<BookListScreen> {
           final isSelected = _selectedFilter == f['id'];
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: _BouncyFilterChip(
+            child: BouncyFilterChip(
               label: f['label'] as String,
               isSelected: isSelected,
               onTap: () {
@@ -536,114 +536,6 @@ class _BookListScreenState extends State<BookListScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BouncyFilterChip extends StatefulWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _BouncyFilterChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  State<_BouncyFilterChip> createState() => _BouncyFilterChipState();
-}
-
-class _BouncyFilterChipState extends State<_BouncyFilterChip>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 110),
-      reverseDuration: const Duration(milliseconds: 180),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.93).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOut,
-        reverseCurve: Curves.easeOutBack,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => _controller.forward(),
-        onTapUp: (_) => _controller.reverse(),
-        onTapCancel: () => _controller.reverse(),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          widget.onTap();
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
-          decoration: BoxDecoration(
-            gradient: widget.isSelected
-                ? const LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Color(0xFF0088FF),
-                      Color(0xFF0775D5),
-                    ],
-                  )
-                : null,
-            color: widget.isSelected ? null : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: widget.isSelected
-                ? null
-                : Border.all(
-                    color: const Color(0xFFE2E8F0),
-                    width: 1.2,
-                  ),
-            boxShadow: [
-              BoxShadow(
-                color: widget.isSelected
-                    ? const Color(0xFF0088FF).withValues(alpha: 0.28)
-                    : Colors.black.withValues(alpha: 0.03),
-                blurRadius: widget.isSelected ? 8 : 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
-            style: TextStyle(
-              color: widget.isSelected ? Colors.white : const Color(0xFF64748B),
-              fontWeight: widget.isSelected ? FontWeight.w700 : FontWeight.w600,
-              fontSize: 13,
-            ),
-            child: Text(widget.label),
-          ),
         ),
       ),
     );

@@ -4,34 +4,20 @@ import '../providers/finance_provider.dart';
 
 class FinanceCategoryDonutChart extends StatelessWidget {
   final List<CategoryBreakdownItem> breakdown;
+  final bool showContainer;
 
   const FinanceCategoryDonutChart({
     super.key,
     required this.breakdown,
+    this.showContainer = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasData = breakdown.isNotEmpty;
 
-    return Container(
-      width: double.infinity,
+    final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFF1F5F9),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -117,6 +103,28 @@ class FinanceCategoryDonutChart extends StatelessWidget {
             ),
         ],
       ),
+    );
+
+    if (!showContainer) return content;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFF1F5F9),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: content,
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:kita_story/features/games/sudoku/providers/sudoku_provider.dart';
 import 'package:kita_story/features/games/sudoku/widgets/sudoku_grid.dart';
 import 'package:kita_story/features/games/sudoku/widgets/sudoku_numpad.dart';
+import 'package:kita_story/features/games/sudoku/widgets/game_won_overlay.dart';
 
 class SudokuGameScreen extends StatelessWidget {
   const SudokuGameScreen({super.key});
@@ -19,55 +20,67 @@ class SudokuGameScreen extends StatelessWidget {
             // Normally you'd use a listener in initState or didChangeDependencies,
             // but for simplicity we can show dialogs here or just update UI.
 
-            return Column(
-              children: [
-                _buildHeader(context),
-                _buildInfoBar(provider),
-                const SizedBox(height: 24),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        // Sudoku Grid
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Center(
-                            child: SudokuGrid(
-                              grid: provider.grid,
-                              selectedCell: provider.selectedCell,
-                              currentHint: provider.currentHint,
-                              onCellTap: provider.selectCell,
-                            ),
+              return Stack(
+                children: [
+                  Column(
+                    children: [
+                      _buildHeader(context),
+                      _buildInfoBar(provider),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              // Sudoku Grid
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Center(
+                                  child: SudokuGrid(
+                                    grid: provider.grid,
+                                    selectedCell: provider.selectedCell,
+                                    currentHint: provider.currentHint,
+                                    onCellTap: provider.selectCell,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 32),
+                              // NumPad
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                child: SudokuNumPad(
+                                  onNumberSelected: provider.inputNumber,
+                                  onErase: provider.eraseSelected,
+                                  onHint: () => _handleHint(context, provider),
+                                  hintsLeft: provider.hintsLeft,
+                                  isNumberCompleted: provider.isNumberCompleted,
+                                ),
+                              ),
+                              const SizedBox(height: 32),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 32),
-                        // NumPad
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: SudokuNumPad(
-                            onNumberSelected: provider.inputNumber,
-                            onErase: provider.eraseSelected,
-                            onHint: () => _handleHint(context, provider),
-                            hintsLeft: provider.hintsLeft,
-                            isNumberCompleted: provider.isNumberCompleted,
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ),
-
-                // Show overlays if game ended
-                if (provider.gameState == SudokuGameState.won)
-                  _buildGameResult(context, true, provider.pointsForDifficulty),
-                if (provider.gameState == SudokuGameState.lost)
-                  _buildGameResult(context, false, 0),
-              ],
-            );
-          },
+                  
+                  // Show overlays if game ended
+                  if (provider.gameState == SudokuGameState.won)
+                    GameWonOverlay(
+                      points: provider.pointsForDifficulty,
+                      onHome: () => context.pop(),
+                    ),
+                  if (provider.gameState == SudokuGameState.lost)
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: _buildGameResult(context, false, 0),
+                    ),
+                ],
+              );
+            },
+          ),
         ),
-      ),
     );
   }
 

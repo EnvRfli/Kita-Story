@@ -85,10 +85,19 @@ Selamat datang di repositori **Day Tale**! Dokumen ini adalah panduan lengkap ar
 * Timeline agenda harian (waktu mulai-selesai, deskripsi, status selesai) dengan visual garis berakar.
 
 ### G. Keuangan & Budgeting Tracker (`lib/features/finances`)
-* Kartu saldo total gradien ungu 3D dengan kalkulasi otomatis *Sisa Bersih Tabungan Bulan Ini* (`Pemasukan - Pengeluaran`).
+* Kartu saldo total gradien ungu 3D dengan kalkulasi otomatis baris bawah *Sisa bulan ini* berbasis sisa kuota budget yang bersifat bulanan (`Total Budget Bulanan - Total Pengeluaran Bulanan Terkait`).
 * Kartu ganda pemasukan (toska) dan pengeluaran (koral) per periode berjalan.
-* Donut chart kategori pengeluaran murni Flutter `CustomPainter` dengan legenda dinamis.
-* Transaksi harian dengan modal detail untuk ubah/hapus dan filter periode kalender.
+* **Card Carousel Kategori & Budget (`FinanceExpenseCarousel`)**:
+  * Menggabungkan *Donut Chart* Kategori Pengeluaran (Slide 1) dan *Budget Overview Slide* (Slide 2) dengan indikator titik animasi halus.
+* **Fitur Budgeting & Anggaran Kategori (`FinanceBudgetModel`, `budget_list_screen.dart`, `finance_budgets`)**:
+  * Fleksibilitas periode: Bulanan (default per tanggal 1 atau custom payday), Mingguan, Harian, atau Rentang Tanggal Kustom.
+  * Dukungan **Budget Bersama** pasangan dengan badge hati biru pastel.
+  * **Auto-Renew Rollover (Per Jam 00:00 / Ganti Hari)**: Menghitung rentang siklus aktif baru secara instan tanpa lag cron server.
+  * **Rekomendasi Belanja Harian (*Daily Safe-to-Spend*)**: Menghitung `sisa budget / sisa hari` untuk menjaga ritme belanja pengguna.
+  * **Status Visual 3 Tahap**: Aman (<80%), Waspada (80%-100%), Overbudget (>100%).
+  * **Push Notification Lokal Otomatis**: Notifikasi instan via `NotificationService` saat transaksi dicatat dan mencapai threshold 80% atau 100% (dengan flag pencegah notifikasi ganda per siklus).
+  * Gamifikasi: `+5 Poin` saat membuat budget baru (`add_budget`).
+* **Android Home Screen AppWidget (2x2)**: Widget homescreen native kompak 2x2 dengan gradasi ungu 3D, fokus privasi (menampilkan sisa budget bulanan tanpa saldo keseluruhan), dan tombol aksi cepat (*Quick Actions*) `+ Pendapatan` / `+ Pengeluaran` murni tanpa aset PNG yang terhubung via deep link ke modal form transaksi.
 
 ### H. Brankas Kredensial & PIN Keamanan (`lib/features/credentials`, `lib/core/services/encryption_service.dart`)
 * **Autentikasi PIN Keamanan 6 Digit (`PinAuthBottomSheet`, `user_security_pins`)**:

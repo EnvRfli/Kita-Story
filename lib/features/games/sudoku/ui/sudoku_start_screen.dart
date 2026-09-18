@@ -1,12 +1,93 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:kita_story/core/network/supabase_client.dart';
 import 'package:kita_story/features/games/sudoku/providers/sudoku_provider.dart';
 import 'package:kita_story/features/games/sudoku/ui/sudoku_game_screen.dart';
 import 'package:kita_story/features/games/sudoku/widgets/sudoku_mode_bottom_sheet.dart';
 
-class SudokuStartScreen extends StatelessWidget {
+class SudokuStartScreen extends StatefulWidget {
   const SudokuStartScreen({super.key});
+
+  @override
+  State<SudokuStartScreen> createState() => _SudokuStartScreenState();
+}
+
+class _SudokuStartScreenState extends State<SudokuStartScreen> {
+  bool _isLoading = true;
+  Map<String, int?> _bestTimes = {
+    'Mudah': null,
+    'Normal': null,
+    'Susah': null,
+    'Sangat Susah': null,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchBestTimes();
+  }
+
+  Future<void> _fetchBestTimes() async {
+    try {
+      final client = SupabaseNetwork.client;
+      final user = client.auth.currentUser;
+      if (user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final response = await client
+          .from('game_history')
+          .select('difficulty, duration_seconds')
+          .eq('game_type', 'sudoku')
+          .eq('user_id', user.id)
+          .eq('status', 'completed');
+
+      Map<String, int?> best = {
+        'Mudah': null,
+        'Normal': null,
+        'Susah': null,
+        'Sangat Susah': null,
+      };
+
+      for (var row in response) {
+        String diff = row['difficulty'] as String;
+        int duration = row['duration_seconds'] as int;
+        if (best.containsKey(diff)) {
+          int? currentBest = best[diff];
+          if (currentBest == null || duration < currentBest) {
+            best[diff] = duration;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _bestTimes = best;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching best times: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  String _formatDuration(int? seconds) {
+    if (seconds == null) return '-';
+    if (seconds < 60) return '$seconds detik';
+    final minutes = seconds ~/ 60;
+    final hrs = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hrs > 0) {
+      if (mins == 0) return '$hrs jam';
+      return '$hrs jam $mins menit';
+    }
+    return '$minutes menit';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +123,7 @@ class SudokuStartScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         const SizedBox(height: 24),
-                        // Sudoku Icon Placeholder (Using a container for now)
+                        // Sudoku Icon Placeholder
                         Container(
                           width: 80,
                           height: 80,
@@ -94,11 +175,17 @@ class SudokuStartScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 40),
                         
-                        // History Tiles (Mock data for now, ideally fetched from game_history)
-                        _buildHistoryTile('Mudah', '11 menit'),
-                        _buildHistoryTile('Normal', '1 jam 15 menit'),
-                        _buildHistoryTile('Susah', '2 jam 7 menit'),
-                        _buildHistoryTile('Sangat Susah', '-'),
+                        if (_isLoading)
+                          const Padding(
+                            padding: EdgeInsets.all(40.0),
+                            child: CircularProgressIndicator(),
+                          )
+                        else ...[
+                          _buildHistoryTile('Mudah', _formatDuration(_bestTimes['Mudah'])),
+                          _buildHistoryTile('Normal', _formatDuration(_bestTimes['Normal'])),
+                          _buildHistoryTile('Susah', _formatDuration(_bestTimes['Susah'])),
+                          _buildHistoryTile('Sangat Susah', _formatDuration(_bestTimes['Sangat Susah'])),
+                        ],
                         
                         const SizedBox(height: 100), // Space for button
                       ],
@@ -117,7 +204,15 @@ class SudokuStartScreen extends StatelessWidget {
             child: SizedBox(
               height: 56,
               child: ElevatedButton(
-                onPressed: () => _showModeSelector(context),
+                onPressed: () {
+                   // Refresh data when returning from game
+                   _showModeSelector(context).then((_) {
+                      if (mounted) {
+                        setState(() => _isLoading = true);
+                        _fetchBestTimes();
+                      }
+                   });
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0088FF),
                   shape: RoundedRectangleBorder(
@@ -204,7 +299,7 @@ class SudokuStartScreen extends StatelessWidget {
     );
   }
 
-  void _showModeSelector(BuildContext context) async {
+  Future<void> _showModeSelector(BuildContext context) async {
     final selectedMode = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -213,7 +308,7 @@ class SudokuStartScreen extends StatelessWidget {
 
     if (selectedMode != null && context.mounted) {
       // Start the game by navigating and wrapping with provider
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ChangeNotifierProvider(
             create: (_) {

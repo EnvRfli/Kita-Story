@@ -387,4 +387,38 @@ CREATE TABLE IF NOT EXISTS user_credentials (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 9. Finance & Budgeting Module
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  partner_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  is_shared BOOLEAN NOT NULL DEFAULT true,
+  type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+  title TEXT NOT NULL,
+  category TEXT NOT NULL,
+  amount NUMERIC NOT NULL CHECK (amount >= 0),
+  transaction_date TIMESTAMPTZ NOT NULL DEFAULT now(),
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS finance_budgets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  partner_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  is_shared BOOLEAN NOT NULL DEFAULT false,
+  category TEXT NOT NULL,
+  amount NUMERIC NOT NULL CHECK (amount > 0),
+  period_type TEXT NOT NULL DEFAULT 'monthly', -- 'daily', 'weekly', 'monthly', 'custom'
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  repeat_type TEXT NOT NULL DEFAULT 'auto_renew', -- 'auto_renew', 'none'
+  monthly_start_day INTEGER NOT NULL DEFAULT 1,
+  alert_80_notified BOOLEAN NOT NULL DEFAULT false,
+  alert_100_notified BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```

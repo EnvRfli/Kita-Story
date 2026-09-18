@@ -6,6 +6,7 @@ import '../models/credential_model.dart';
 import '../providers/credential_provider.dart';
 import '../widgets/credential_card.dart';
 import '../widgets/credential_detail_bottom_sheet.dart';
+import 'package:kita_story/core/widgets/bouncy_filter_chip.dart';
 
 class CredentialsScreen extends StatefulWidget {
   const CredentialsScreen({super.key});
@@ -46,7 +47,12 @@ class _CredentialsScreenState extends State<CredentialsScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<CredentialProvider>();
     final filteredList = provider.filteredCredentials;
-    final categories = ['Semua', ...provider.categories.map((c) => c.name)];
+    final dynamicCategories = provider.categories.map((c) => c.name).toList();
+    if (dynamicCategories.contains('Lainnya')) {
+      dynamicCategories.remove('Lainnya');
+      dynamicCategories.add('Lainnya');
+    }
+    final categories = ['Semua', ...dynamicCategories];
 
     return Scaffold(
       backgroundColor: const Color(0xFFFCFCFD),
@@ -106,63 +112,24 @@ class _CredentialsScreenState extends State<CredentialsScreen> {
             ),
 
             // 3. Category Filter Tabs / Pills
-            SizedBox(
-              height: 42,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                scrollDirection: Axis.horizontal,
-                itemCount: categories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final cat = categories[index];
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              clipBehavior: Clip.none,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+              child: Row(
+                children: categories.map((cat) {
                   final isSelected = provider.selectedCategory.toLowerCase() ==
                       cat.toLowerCase();
-
-                  return InkWell(
-                    onTap: () => provider.setSelectedCategory(cat),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 9,
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            isSelected ? const Color(0xFF007DFE) : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFF007DFE)
-                              : const Color(0xFFE2E8F0),
-                          width: 1.1,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFF007DFE)
-                                      .withValues(alpha: 0.35),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          cat,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight:
-                                isSelected ? FontWeight.w700 : FontWeight.w600,
-                            color: isSelected
-                                ? Colors.white
-                                : const Color(0xFF64748B),
-                          ),
-                        ),
-                      ),
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: BouncyFilterChip(
+                      label: cat,
+                      isSelected: isSelected,
+                      onTap: () => provider.setSelectedCategory(cat),
                     ),
                   );
-                },
+                }).toList(),
               ),
             ),
             const SizedBox(height: 12),

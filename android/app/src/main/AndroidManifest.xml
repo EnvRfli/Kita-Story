@@ -34,7 +34,27 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Deep Link Scheme for Widget Quick Actions -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="daytale" android:host="finance" />
+            </intent-filter>
         </activity>
+
+        <!-- Finance Home Screen Widget (4x2) -->
+        <receiver
+            android:name=".FinanceWidgetProvider"
+            android:exported="true"
+            android:label="DayTale Keuangan">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/finance_widget_info" />
+        </receiver>
 
         <!-- Scheduled Local Notification & Alarm Receivers -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />

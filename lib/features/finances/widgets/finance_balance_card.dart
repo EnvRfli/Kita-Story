@@ -3,17 +3,25 @@ import 'package:flutter/material.dart';
 import '../providers/finance_provider.dart';
 
 class FinanceBalanceCard extends StatelessWidget {
+  final String title;
   final double totalBalance;
   final double netSavings;
   final bool isBalanceVisible;
   final VoidCallback onToggleVisibility;
+  final String? subtitleLabel;
+  final bool showPlusSign;
+  final String? customDateText;
 
   const FinanceBalanceCard({
     super.key,
+    this.title = 'Saldo Keseluruhan',
     required this.totalBalance,
     required this.netSavings,
     required this.isBalanceVisible,
     required this.onToggleVisibility,
+    this.subtitleLabel,
+    this.showPlusSign = true,
+    this.customDateText,
   });
 
   static const List<String> _months = [
@@ -36,12 +44,15 @@ class FinanceBalanceCard extends StatelessWidget {
     final now = DateTime.now();
     final monthName = _months[now.month - 1];
     final year = now.year;
+    final dateDisplay = customDateText ?? '$monthName $year';
 
     final formattedBalance = FinanceProvider.formatRupiah(totalBalance);
     final isNetPositive = netSavings >= 0;
-    final netPrefix = isNetPositive ? '+' : '';
-    final formattedNetSavings =
-        '$netPrefix${FinanceProvider.formatRupiah(netSavings)}';
+    final rawFormattedSavings = FinanceProvider.formatRupiah(netSavings);
+    final formattedNetSavings = (isNetPositive && showPlusSign)
+        ? '+$rawFormattedSavings'
+        : rawFormattedSavings;
+    final label = subtitleLabel ?? 'Sisa bulan ini';
 
     return Container(
       width: double.infinity,
@@ -70,7 +81,7 @@ class FinanceBalanceCard extends StatelessWidget {
             // 1. Triangular geometric facet overlay (left -20 deg, right +20 deg, gradient 5% to 0% white)
             Positioned.fill(
               child: CustomPaint(
-                painter: _CardGeometricFacetPainter(),
+                painter: CardGeometricFacetPainter(),
               ),
             ),
 
@@ -99,15 +110,20 @@ class FinanceBalanceCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Saldo Keseluruhan',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.88),
-                          letterSpacing: -0.2,
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.88),
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
@@ -131,7 +147,7 @@ class FinanceBalanceCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              '$monthName $year',
+                              dateDisplay,
                               style: const TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
@@ -179,7 +195,7 @@ class FinanceBalanceCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
 
-                  // C. Bottom Row: Sisa Bersih Tabungan Bulan Ini
+                  // C. Bottom Row: Sisa Bersih Tabungan Bulan Ini / Sisa Budget
                   Row(
                     children: [
                       Icon(
@@ -187,17 +203,21 @@ class FinanceBalanceCard extends StatelessWidget {
                             ? Icons.savings_outlined
                             : Icons.warning_amber_rounded,
                         size: 15,
-                        color: Colors.white.withValues(alpha: 0.75),
+                        color: isNetPositive
+                            ? Colors.white.withValues(alpha: 0.75)
+                            : const Color(0xFFFFB3B3),
                       ),
                       const SizedBox(width: 6),
                       Text(
                         isBalanceVisible
-                            ? 'Sisa bulan ini: $formattedNetSavings'
-                            : 'Sisa bulan ini: ••••••••',
+                            ? '$label: $formattedNetSavings'
+                            : '$label: ••••••••',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.82),
+                          color: isNetPositive
+                              ? Colors.white.withValues(alpha: 0.82)
+                              : const Color(0xFFFFB3B3),
                           letterSpacing: -0.1,
                         ),
                       ),
@@ -214,7 +234,7 @@ class FinanceBalanceCard extends StatelessWidget {
 }
 
 /// Geometric Facet Painter: 2 Equilateral Triangles (+20 deg & -20 deg) with 5% to 0% white gradient
-class _CardGeometricFacetPainter extends CustomPainter {
+class CardGeometricFacetPainter extends CustomPainter {
   Path _createEquilateralTriangle(double sideLength) {
     final h = sideLength *
         math.sqrt(3) /

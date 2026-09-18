@@ -17,6 +17,7 @@ import 'features/credentials/providers/credential_security_provider.dart';
 import 'features/credentials/providers/credential_provider.dart';
 
 import 'core/router/app_router.dart';
+import 'core/services/finance_widget_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,27 @@ void main() async {
 
   // Initialize Local Notifications
   await NotificationService.initialize();
+
+  // Initialize Android Home Screen Widget Service & Listen for Quick Actions
+  FinanceWidgetService.initialize();
+  FinanceWidgetService.onWidgetAction.listen((action) {
+    if (action.isEmpty) return;
+    final location =
+        appRouter.routerDelegate.currentConfiguration.uri.toString();
+    if (location == '/') {
+      // Still on splash screen! SplashScreen._checkAuth() will handle navigation after auth.
+      return;
+    }
+    if (location.startsWith('/finance')) {
+      // Already on finance screen; FinanceScreen's internal listener handles the modal directly
+      return;
+    }
+    if (action == 'open') {
+      appRouter.push('/finance');
+    } else {
+      appRouter.push('/finance?action=$action');
+    }
+  });
 
   runApp(const KitaStoryApp());
 }

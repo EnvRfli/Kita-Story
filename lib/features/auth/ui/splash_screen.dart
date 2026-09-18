@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
+import '../../../core/services/finance_widget_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -153,7 +154,17 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (authProvider.isAuthenticated) {
+      final widgetAction = await FinanceWidgetService.getInitialAction();
+      if (!mounted) return;
+
       context.go('/home');
+      if (widgetAction != null && widgetAction.isNotEmpty) {
+        if (widgetAction == 'open') {
+          context.push('/finance');
+        } else {
+          context.push('/finance?action=$widgetAction');
+        }
+      }
     } else {
       context.go('/login');
     }

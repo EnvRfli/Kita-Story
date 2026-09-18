@@ -3,7 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/finance_category_model.dart';
 import '../models/finance_filter_model.dart';
 import '../models/transaction_model.dart';
+import '../models/finance_budget_model.dart';
 import '../repositories/finance_repository.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/services/finance_widget_service.dart';
 
 class CategoryBreakdownItem {
   final String name;
@@ -29,6 +32,12 @@ class FinanceProvider extends ChangeNotifier {
   static const int _pageSize = 15;
   List<TransactionModel> _pagedTransactions = [];
   List<TransactionModel> get pagedTransactions => _pagedTransactions;
+
+  // Budgets state
+  List<FinanceBudgetModel> _budgets = [];
+  List<FinanceBudgetModel> get budgets => _budgets;
+  bool _isLoadingBudgets = false;
+  bool get isLoadingBudgets => _isLoadingBudgets;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -77,8 +86,17 @@ class FinanceProvider extends ChangeNotifier {
   Future<void> toggleBalanceVisibility() async {
     _isBalanceVisible = !_isBalanceVisible;
     notifyListeners();
+    _syncWidget();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('finance_is_balance_visible', _isBalanceVisible);
+  }
+
+  void _syncWidget() {
+    FinanceWidgetService.updateWidget(
+      totalBalance: totalBalance,
+      totalRemaining: totalMonthlyBudgetRemaining(),
+      isBalanceVisible: _isBalanceVisible,
+    );
   }
 
   void setFilter(FinanceFilterModel newFilter) {
@@ -295,6 +313,7 @@ class FinanceProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+      _syncWidget();
     }
   }
 
@@ -409,6 +428,11 @@ class FinanceProvider extends ChangeNotifier {
       _pagedTransactions.insert(0, newTransaction);
 
       notifyListeners();
+      _syncWidget();
+
+      // Check budget thresholds for instant push notification alert
+      _checkBudgetAlerts(newTransaction);
+
       return true;
     } catch (e) {
       _errorMessage = e.toString();
@@ -454,6 +478,11 @@ class FinanceProvider extends ChangeNotifier {
       }
 
       notifyListeners();
+      _syncWidget();
+
+      // Check budget thresholds for instant push notification alert
+      _checkBudgetAlerts(updated);
+
       return true;
     } catch (e) {
       _errorMessage = e.toString();
@@ -469,11 +498,197 @@ class FinanceProvider extends ChangeNotifier {
       _transactions.removeWhere((t) => t.id == transactionId);
       _pagedTransactions.removeWhere((t) => t.id == transactionId);
       notifyListeners();
+      _syncWidget();
       return true;
     } catch (e) {
       _errorMessage = e.toString();
       notifyListeners();
       return false;
+    }
+  }
+
+  // ===========================================================================
+  // BUDGETS MANAGEMENT & ALERTS
+  // ===========================================================================
+
+  /// Fetch active budgets
+  Future<void> fetchBudgets({String? targetUserId, String? partnerId}) async {
+    _isLoadingBudgets = true;
+    notifyListeners();
+
+    try {
+      _budgets = await _repository.getBudgets(
+        targetUserId: targetUserId,
+        partnerId: partnerId,
+      );
+    } catch (e) {
+      debugPrint('Error fetching budgets in FinanceProvider: $e');
+    } finally {
+      _isLoadingBudgets = false;
+      notifyListeners();
+      _syncWidget();
+    }
+  }
+
+  /// Get calculated progress for all budgets
+  List<FinanceBudgetProgress> getBudgetProgressList({String? currentUserId}) {
+    return _budgets
+        .map((b) => b.calculateProgress(_transactions, currentUserId: currentUserId))
+        .toList();
+  }
+
+  /// Total remaining budget for all monthly budgets:
+  /// (Total Monthly Budget Allocated - Total Expenses of the Month regardless of category)
+  double totalMonthlyBudgetRemaining({String? currentUserId}) {
+    final monthlyBudgets =
+        _budgets.where((b) => b.periodType == 'monthly').toList();
+    if (monthlyBudgets.isEmpty) return 0.0;
+
+    final totalBudget = monthlyBudgets.fold(0.0, (sum, b) => sum + b.amount);
+    return totalBudget - currentMonthExpense;
+  }
+
+  /// Total allocated budget for all monthly budgets
+  double get totalMonthlyBudgetAllocated {
+    return _budgets
+        .where((b) => b.periodType == 'monthly')
+        .fold(0.0, (sum, b) => sum + b.amount);
+  }
+
+  /// Add a new budget
+  Future<bool> addBudget({
+    required String category,
+    required double amount,
+    required String periodType,
+    required DateTime startDate,
+    required DateTime endDate,
+    String repeatType = 'auto_renew',
+    int monthlyStartDay = 1,
+    bool isShared = false,
+    String? partnerId,
+  }) async {
+    try {
+      final newBudget = await _repository.createBudget(
+        category: category,
+        amount: amount,
+        periodType: periodType,
+        startDate: startDate,
+        endDate: endDate,
+        repeatType: repeatType,
+        monthlyStartDay: monthlyStartDay,
+        isShared: isShared,
+        partnerId: partnerId,
+      );
+
+      _budgets.insert(0, newBudget);
+      notifyListeners();
+      _syncWidget();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Gagal menambah budget: $e';
+      debugPrint(_errorMessage);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Update an existing budget
+  Future<bool> editBudget(
+    String budgetId, {
+    required String category,
+    required double amount,
+    required String periodType,
+    required DateTime startDate,
+    required DateTime endDate,
+    String repeatType = 'auto_renew',
+    int monthlyStartDay = 1,
+    bool isShared = false,
+    String? partnerId,
+  }) async {
+    try {
+      final updated = await _repository.updateBudget(
+        budgetId,
+        category: category,
+        amount: amount,
+        periodType: periodType,
+        startDate: startDate,
+        endDate: endDate,
+        repeatType: repeatType,
+        monthlyStartDay: monthlyStartDay,
+        isShared: isShared,
+        partnerId: partnerId,
+      );
+
+      final index = _budgets.indexWhere((b) => b.id == budgetId);
+      if (index != -1) {
+        _budgets[index] = updated;
+        notifyListeners();
+        _syncWidget();
+      }
+      return true;
+    } catch (e) {
+      _errorMessage = 'Gagal memperbarui budget: $e';
+      debugPrint(_errorMessage);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Remove a budget
+  Future<bool> removeBudget(String budgetId) async {
+    try {
+      await _repository.deleteBudget(budgetId);
+      _budgets.removeWhere((b) => b.id == budgetId);
+      notifyListeners();
+      _syncWidget();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Gagal menghapus budget: $e';
+      debugPrint(_errorMessage);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Evaluate budget health after transaction entry and trigger instant push notification
+  Future<void> _checkBudgetAlerts(TransactionModel transaction) async {
+    if (!transaction.isExpense) return;
+
+    for (int i = 0; i < _budgets.length; i++) {
+      final budget = _budgets[i];
+      if (!budget.matchesCategory(transaction.category)) continue;
+
+      final progress = budget.calculateProgress(_transactions);
+
+      // Alert 80%
+      if (progress.percentage >= 80.0 && !budget.alert80Notified && !progress.isOverBudget) {
+        try {
+          await NotificationService.showInstantNotification(
+            id: budget.id.hashCode & 0x7FFFFFFF,
+            title: '⚠️ Peringatan Budget: ${budget.category}',
+            body: 'Pengeluaran "${budget.category}" sudah mencapai ${progress.percentage.toStringAsFixed(0)}% dari batas budget!',
+          );
+          await _repository.updateBudgetNotificationFlags(budget.id, alert80: true);
+          _budgets[i] = budget.copyWith(alert80Notified: true);
+        } catch (err) {
+          debugPrint('Notification 80% error: $err');
+        }
+      }
+
+      // Alert 100% (Overbudget)
+      if (progress.isOverBudget && !budget.alert100Notified) {
+        try {
+          await NotificationService.showInstantNotification(
+            id: (budget.id.hashCode + 1) & 0x7FFFFFFF,
+            title: '🚨 Budget Terlampaui: ${budget.category}',
+            body: 'Pengeluaran "${budget.category}" sudah melebihi batas budget yang ditetapkan!',
+          );
+          await _repository.updateBudgetNotificationFlags(budget.id, alert100: true);
+          _budgets[i] = budget.copyWith(alert100Notified: true);
+        } catch (err) {
+          debugPrint('Notification 100% error: $err');
+        }
+      }
     }
   }
 
