@@ -125,6 +125,7 @@ class _WidgetRepository extends Game2048Repository {
 
   @override
   Future<Game2048Result> saveResult({
+    required String runId,
     required int score,
     required int highestTile,
     required int movesCount,
@@ -133,7 +134,7 @@ class _WidgetRepository extends Game2048Repository {
     saveCount++;
     if (failResultSaves) throw StateError('offline');
     return Game2048Result(
-      id: 'test-result',
+      id: runId,
       userId: 'test-user',
       partnerId: null,
       score: score,
