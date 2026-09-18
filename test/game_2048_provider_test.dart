@@ -108,6 +108,7 @@ class RecordingRepository extends Game2048Repository {
   final List<Set<int>> claimCalls = [];
   final List<
       ({
+        String runId,
         int score,
         int highestTile,
         int movesCount,
@@ -123,12 +124,14 @@ class RecordingRepository extends Game2048Repository {
 
   @override
   Future<Game2048Result> saveResult({
+    required String runId,
     required int score,
     required int highestTile,
     required int movesCount,
     required int durationSeconds,
   }) async {
     saveCalls.add((
+      runId: runId,
       score: score,
       highestTile: highestTile,
       movesCount: movesCount,
@@ -235,6 +238,7 @@ void main() {
         storage: storage,
         repository: repository,
         clock: () => currentTime,
+        runIdGenerator: () => '11111111-1111-4111-8111-111111111111',
       );
 
       await provider.newGame();
@@ -246,6 +250,7 @@ void main() {
 
       expect(repository.saveCalls, [
         (
+          runId: '11111111-1111-4111-8111-111111111111',
           score: 4,
           highestTile: 4,
           movesCount: 1,
@@ -267,6 +272,7 @@ void main() {
         ),
         storage: storage,
         repository: repository,
+        runIdGenerator: () => '22222222-2222-4222-8222-222222222222',
       );
 
       await provider.newGame();
@@ -281,6 +287,36 @@ void main() {
       await provider.retryPendingWrites();
 
       expect(repository.saveCalls, hasLength(2));
+      expect(
+        repository.saveCalls.map((call) => call.runId).toSet(),
+        {'22222222-2222-4222-8222-222222222222'},
+      );
+      expect(storage.activeSnapshot, isNull);
+      expect(provider.hasPendingWrite, isFalse);
+      expect(provider.status, Game2048Status.gameOver);
+    });
+
+    test('end run retries a failed finalization in the same provider',
+        () async {
+      final storage = MemoryStorage();
+      final repository = RecordingRepository(saveOutcomes: [false, true]);
+      final provider = Game2048Provider(
+        engine: ScriptedEngine(
+          initialTiles: [tile(1, 2), tile(2, 2)],
+          results: const [],
+        ),
+        storage: storage,
+        repository: repository,
+      );
+
+      await provider.newGame();
+      await provider.endRun();
+      expect(provider.status, Game2048Status.error);
+
+      await provider.endRun();
+
+      expect(repository.saveCalls, hasLength(2));
+      expect(repository.saveCalls[1].runId, repository.saveCalls[0].runId);
       expect(storage.activeSnapshot, isNull);
       expect(provider.hasPendingWrite, isFalse);
       expect(provider.status, Game2048Status.gameOver);
@@ -345,6 +381,7 @@ void main() {
         ),
         storage: storage,
         repository: firstRepository,
+        runIdGenerator: () => '33333333-3333-4333-8333-333333333333',
       );
       await firstProvider.newGame();
       await firstProvider.endRun();
@@ -364,6 +401,10 @@ void main() {
 
       expect(await restoredProvider.restore(), isTrue);
       expect(retryRepository.saveCalls, hasLength(1));
+      expect(
+        retryRepository.saveCalls.single.runId,
+        '33333333-3333-4333-8333-333333333333',
+      );
       expect(storage.activeSnapshot, isNull);
       expect(restoredProvider.status, Game2048Status.gameOver);
 

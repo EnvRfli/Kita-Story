@@ -25,10 +25,12 @@ class Game2048Provider extends ChangeNotifier {
     required Game2048Repository repository,
     this.animationDuration = const Duration(milliseconds: 170),
     DateTime Function()? clock,
+    String Function()? runIdGenerator,
   })  : _engine = engine,
         _storage = storage,
         _repository = repository,
-        _clock = clock ?? DateTime.now;
+        _clock = clock ?? DateTime.now,
+        _runIdGenerator = runIdGenerator ?? _generateRunId;
 
   static const int _initialUndos = 3;
 
@@ -36,6 +38,7 @@ class Game2048Provider extends ChangeNotifier {
   final Game2048LocalStorage _storage;
   final Game2048Repository _repository;
   final DateTime Function() _clock;
+  final String Function() _runIdGenerator;
   final Duration animationDuration;
 
   List<Game2048Tile> _tiles = const [];
@@ -178,6 +181,18 @@ class Game2048Provider extends ChangeNotifier {
       _pendingResultWrite = snapshot.pendingFinalization;
       _startedAt = snapshot.startedAt;
       if (_pendingResultWrite != null) {
+        final pending = _pendingResultWrite!;
+        if (pending.runId == null) {
+          _pendingResultWrite = Game2048PendingFinalization(
+            runId: _runIdGenerator(),
+            score: pending.score,
+            highestTile: pending.highestTile,
+            movesCount: pending.movesCount,
+            durationSeconds: pending.durationSeconds,
+            resultConfirmed: pending.resultConfirmed,
+          );
+          await _storage.save(_snapshot(includeUndoHistory: true));
+        }
         _status = Game2048Status.saving;
         notifyListeners();
         await retryPendingWrites();
@@ -349,12 +364,18 @@ class Game2048Provider extends ChangeNotifier {
     if (existing != null) return existing;
 
     _isEndRunRequested = true;
-    final pending = _beginEndRun(
+    late Future<void> tracked;
+    tracked = _beginEndRun(
       statusAfterSuccess,
       settleAnimation: settleAnimation,
-    );
-    _endRunFuture = pending;
-    return pending;
+    ).whenComplete(() {
+      if (_pendingResultWrite != null && identical(_endRunFuture, tracked)) {
+        _endRunFuture = null;
+        _isEndRunRequested = false;
+      }
+    });
+    _endRunFuture = tracked;
+    return tracked;
   }
 
   Future<void> retryPendingWrites() async {
@@ -393,6 +414,7 @@ class Game2048Provider extends ChangeNotifier {
   void _queuePendingResultWrite() {
     _pauseElapsed();
     _pendingResultWrite ??= Game2048PendingFinalization(
+      runId: _runIdGenerator(),
       score: _score,
       highestTile: _highestTile,
       movesCount: _moveCount,
@@ -412,12 +434,14 @@ class Game2048Provider extends ChangeNotifier {
     try {
       if (!pending.resultConfirmed) {
         await _repository.saveResult(
+          runId: pending.runId!,
           score: pending.score,
           highestTile: pending.highestTile,
           movesCount: pending.movesCount,
           durationSeconds: pending.durationSeconds,
         );
         _pendingResultWrite = Game2048PendingFinalization(
+          runId: pending.runId,
           score: pending.score,
           highestTile: pending.highestTile,
           movesCount: pending.movesCount,
@@ -525,6 +549,18 @@ class Game2048Provider extends ChangeNotifier {
 
   static int _highestTileFor(List<Game2048Tile> tiles) =>
       tiles.fold(0, (highest, tile) => max(highest, tile.value));
+
+  static String _generateRunId() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex =
+        bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
+        '${hex.substring(20)}';
+  }
 
   static Iterable<int> _milestonesThrough(int highestTile) sync* {
     const initialMilestones = [128, 256, 512, 1024, 2048, 4096];

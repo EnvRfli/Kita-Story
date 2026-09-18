@@ -8,6 +8,7 @@ void main() {
 
       expect(
         repository.buildResultPayload(
+          runId: '11111111-1111-4111-8111-111111111111',
           userId: 'me',
           partnerId: 'partner',
           score: 11248,
@@ -16,6 +17,7 @@ void main() {
           durationSeconds: 900,
         ),
         {
+          'id': '11111111-1111-4111-8111-111111111111',
           'game_type': '2048',
           'difficulty': null,
           'user_id': 'me',

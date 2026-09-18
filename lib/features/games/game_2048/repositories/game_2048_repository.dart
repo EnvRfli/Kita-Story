@@ -85,6 +85,7 @@ class Game2048Repository {
   SupabaseClient get _client => _providedClient ?? SupabaseNetwork.client;
 
   Map<String, Object?> buildResultPayload({
+    required String runId,
     required String userId,
     required String? partnerId,
     required int score,
@@ -93,6 +94,7 @@ class Game2048Repository {
     required int durationSeconds,
   }) =>
       {
+        'id': runId,
         'game_type': '2048',
         'difficulty': null,
         'user_id': userId,
@@ -105,6 +107,7 @@ class Game2048Repository {
       };
 
   Future<Game2048Result> saveResult({
+    required String runId,
     required int score,
     required int highestTile,
     required int movesCount,
@@ -114,20 +117,28 @@ class Game2048Repository {
     if (userId == null) throw StateError('A signed-in user is required.');
 
     final partnerId = await _partnerIdFor(userId);
-    final response = await _client
-        .from('game_history')
-        .insert(
-          buildResultPayload(
-            userId: userId,
-            partnerId: partnerId,
-            score: score,
-            highestTile: highestTile,
-            movesCount: movesCount,
-            durationSeconds: durationSeconds,
-          ),
-        )
-        .select()
-        .single();
+    final payload = buildResultPayload(
+      runId: runId,
+      userId: userId,
+      partnerId: partnerId,
+      score: score,
+      highestTile: highestTile,
+      movesCount: movesCount,
+      durationSeconds: durationSeconds,
+    );
+    late final Map<String, dynamic> response;
+    try {
+      response =
+          await _client.from('game_history').insert(payload).select().single();
+    } on PostgrestException catch (error) {
+      if (error.code != '23505') rethrow;
+      response = await _client
+          .from('game_history')
+          .select()
+          .eq('id', runId)
+          .eq('user_id', userId)
+          .single();
+    }
 
     await claimMilestones(milestoneCandidatesFor(highestTile));
     return Game2048Result.fromJson(response);

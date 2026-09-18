@@ -2,6 +2,7 @@ import 'game_2048_tile.dart';
 
 class Game2048PendingFinalization {
   const Game2048PendingFinalization({
+    this.runId,
     required this.score,
     required this.highestTile,
     required this.movesCount,
@@ -9,6 +10,7 @@ class Game2048PendingFinalization {
     required this.resultConfirmed,
   });
 
+  final String? runId;
   final int score;
   final int highestTile;
   final int movesCount;
@@ -16,6 +18,7 @@ class Game2048PendingFinalization {
   final bool resultConfirmed;
 
   Map<String, Object?> toJson() => {
+        'run_id': runId,
         'score': score,
         'highest_tile': highestTile,
         'moves_count': movesCount,
@@ -25,6 +28,9 @@ class Game2048PendingFinalization {
 
   factory Game2048PendingFinalization.fromJson(Map<String, dynamic> json) =>
       Game2048PendingFinalization(
+        runId: json['run_id'] == null
+            ? null
+            : Game2048Snapshot._requiredString(json, 'run_id'),
         score: Game2048Snapshot._requiredInt(json, 'score'),
         highestTile: Game2048Snapshot._requiredInt(json, 'highest_tile'),
         movesCount: Game2048Snapshot._requiredInt(json, 'moves_count'),
@@ -205,6 +211,14 @@ class Game2048Snapshot {
     final value = json[key];
     if (value is! bool) {
       throw FormatException('Expected "$key" to be a boolean.');
+    }
+    return value;
+  }
+
+  static String _requiredString(Map<String, dynamic> json, String key) {
+    final value = json[key];
+    if (value is! String) {
+      throw FormatException('Expected "$key" to be a string.');
     }
     return value;
   }

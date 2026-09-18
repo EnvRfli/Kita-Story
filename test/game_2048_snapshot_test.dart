@@ -33,6 +33,7 @@ void main() {
   test('snapshot round trip preserves pending finalization', () {
     final value = snapshot(
       pendingFinalization: const Game2048PendingFinalization(
+        runId: '11111111-1111-4111-8111-111111111111',
         score: 900,
         highestTile: 128,
         movesCount: 17,
@@ -45,17 +46,39 @@ void main() {
     final restored = Game2048Snapshot.fromJson(json);
 
     expect(json['pending_finalization'], {
+      'run_id': '11111111-1111-4111-8111-111111111111',
       'score': 900,
       'highest_tile': 128,
       'moves_count': 17,
       'duration_seconds': 31,
       'result_confirmed': true,
     });
+    expect(
+      restored.pendingFinalization?.runId,
+      '11111111-1111-4111-8111-111111111111',
+    );
     expect(restored.pendingFinalization?.score, 900);
     expect(restored.pendingFinalization?.highestTile, 128);
     expect(restored.pendingFinalization?.movesCount, 17);
     expect(restored.pendingFinalization?.durationSeconds, 31);
     expect(restored.pendingFinalization?.resultConfirmed, isTrue);
+  });
+
+  test('reads legacy pending finalization without a run id', () {
+    final json = snapshot(
+      pendingFinalization: const Game2048PendingFinalization(
+        score: 900,
+        highestTile: 128,
+        movesCount: 17,
+        durationSeconds: 31,
+        resultConfirmed: false,
+      ),
+    ).toJson();
+    (json['pending_finalization']! as Map<String, Object?>).remove('run_id');
+
+    final restored = Game2048Snapshot.fromJson(json);
+
+    expect(restored.pendingFinalization?.runId, isNull);
   });
 
   test('snapshot round trip preserves board undo and celebration state', () {
