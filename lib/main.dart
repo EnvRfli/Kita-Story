@@ -15,6 +15,11 @@ import 'features/vacations/providers/vacation_provider.dart';
 import 'features/finances/providers/finance_provider.dart';
 import 'features/credentials/providers/credential_security_provider.dart';
 import 'features/credentials/providers/credential_provider.dart';
+import 'features/games/ludo/models/ludo_game_state.dart';
+import 'features/games/ludo/providers/ludo_game_provider.dart';
+import 'features/games/ludo/providers/ludo_invite_provider.dart';
+import 'features/games/ludo/ui/ludo_game_screen.dart';
+import 'features/games/ludo/widgets/ludo_invite_banner.dart';
 
 import 'core/router/app_router.dart';
 import 'core/services/finance_widget_service.dart';
@@ -72,13 +77,94 @@ class KitaStoryApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FinanceProvider()),
         ChangeNotifierProvider(create: (_) => CredentialSecurityProvider()),
         ChangeNotifierProvider(create: (_) => CredentialProvider()),
+        ChangeNotifierProvider(create: (_) => LudoGameProvider()),
+        ChangeNotifierProvider(create: (_) => LudoInviteProvider()),
       ],
       child: MaterialApp.router(
         title: 'DayTale',
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false,
         routerConfig: appRouter,
+        builder: (context, child) {
+          return _GlobalLudoInviteOverlay(child: child ?? const SizedBox());
+        },
       ),
+    );
+  }
+}
+
+class _GlobalLudoInviteOverlay extends StatefulWidget {
+  final Widget child;
+  const _GlobalLudoInviteOverlay({required this.child});
+
+  @override
+  State<_GlobalLudoInviteOverlay> createState() =>
+      _GlobalLudoInviteOverlayState();
+}
+
+class _GlobalLudoInviteOverlayState extends State<_GlobalLudoInviteOverlay> {
+  String? _lastInitializedUser;
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final user = auth.currentUserProfile;
+    final partner = auth.partnerProfile;
+    final inviteProvider = context.watch<LudoInviteProvider>();
+
+    if (user != null && user.id != _lastInitializedUser) {
+      _lastInitializedUser = user.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        inviteProvider.initialize(
+          currentUserId: user.id,
+          partnerId: partner?.id,
+          partnerName: partner?.name,
+        );
+      });
+    }
+
+    final invite = inviteProvider.pendingInvite;
+
+    return Stack(
+      children: [
+        widget.child,
+        if (invite != null)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Material(
+              color: Colors.transparent,
+              child: LudoInviteBanner(
+                partnerName: inviteProvider.partnerName ?? 'Pasangan',
+                onAccept: () async {
+                  final acceptedMatch = await inviteProvider.acceptInvite();
+                  if (acceptedMatch != null && context.mounted) {
+                    final gameProvider = context.read<LudoGameProvider>();
+                    final initialGameState = LudoGameState.fromJson(
+                      acceptedMatch.gameState,
+                    );
+                    await gameProvider.startOnlineGame(
+                      matchId: acceptedMatch.id,
+                      currentUserId: user?.id ?? '',
+                      partnerId: partner?.id,
+                      myColor: acceptedMatch.guestColor,
+                      initialState: initialGameState,
+                    );
+                    if (context.mounted) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const LudoGameScreen(),
+                        ),
+                      );
+                    }
+                  }
+                },
+                onReject: () => inviteProvider.rejectInvite(),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

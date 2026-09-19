@@ -33,6 +33,7 @@ import '../../features/credentials/ui/credentials_screen.dart';
 import '../../features/credentials/ui/add_credential_screen.dart';
 import '../../features/credentials/models/credential_model.dart';
 import '../../features/games/ui/games_screen.dart';
+import '../../features/games/ludo/ui/ludo_start_screen.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -323,6 +324,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/games',
       builder: (context, state) => const GamesScreen(),
+    ),
+    GoRoute(
+      path: '/ludo',
+      builder: (context, state) => const LudoStartScreen(),
     ),
   ],
 );
