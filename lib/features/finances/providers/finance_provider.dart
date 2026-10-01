@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/finance_category_model.dart';
@@ -69,6 +70,190 @@ class FinanceProvider extends ChangeNotifier {
   List<String> _customExpenseCategories = [];
   List<String> get customExpenseCategories => _customExpenseCategories;
 
+  // User Finance Summary Settings
+  final Map<String, int?> _userSummaryStartDays = {};
+  Map<String, int?> get userSummaryStartDays => _userSummaryStartDays;
+
+  bool _isAllTimeView = false;
+  bool get isAllTimeView => _isAllTimeView;
+
+  static const List<String> _shortMonths = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des'
+  ];
+
+  int? getStartDayForUser({String? targetUserId}) {
+    if (targetUserId == null) return null;
+    return _userSummaryStartDays[targetUserId];
+  }
+
+  bool hasCustomStartDay({String? targetUserId}) {
+    final day = getStartDayForUser(targetUserId: targetUserId);
+    return day != null && day >= 1 && day <= 31;
+  }
+
+  Future<void> fetchSummarySettings(String userId) async {
+    // 1. Check local cache first
+    final prefs = await SharedPreferences.getInstance();
+    final cachedVal = prefs.getInt('finance_summary_start_day_$userId');
+    if (cachedVal != null && cachedVal > 0) {
+      _userSummaryStartDays[userId] = cachedVal;
+    }
+
+    // 2. Fetch from Supabase
+    try {
+      final remoteVal = await _repository.getSummaryStartDay(userId);
+      _userSummaryStartDays[userId] = remoteVal;
+      if (remoteVal != null) {
+        await prefs.setInt('finance_summary_start_day_$userId', remoteVal);
+      } else {
+        await prefs.remove('finance_summary_start_day_$userId');
+      }
+    } catch (_) {}
+
+    notifyListeners();
+  }
+
+  Future<void> updateSummaryStartDay({
+    required String userId,
+    int? startDay,
+  }) async {
+    _userSummaryStartDays[userId] = startDay;
+    _isAllTimeView = false;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    if (startDay != null) {
+      await prefs.setInt('finance_summary_start_day_$userId', startDay);
+    } else {
+      await prefs.remove('finance_summary_start_day_$userId');
+    }
+
+    await _repository.saveSummaryStartDay(userId, startDay);
+  }
+
+  void toggleSummaryViewMode() {
+    _isAllTimeView = !_isAllTimeView;
+    notifyListeners();
+  }
+
+  void setAllTimeViewMode(bool isAllTime) {
+    _isAllTimeView = isAllTime;
+    notifyListeners();
+  }
+
+  /// Compute active date range for the user's cycle if startDay is set
+  (DateTime, DateTime)? getCycleRangeForUser({String? targetUserId}) {
+    final startDay = getStartDayForUser(targetUserId: targetUserId);
+    if (startDay == null || startDay < 1 || startDay > 31) return null;
+
+    final now = DateTime.now();
+    final clampedDay = startDay.clamp(1, 28);
+    DateTime start;
+    DateTime end;
+
+    if (now.day >= clampedDay) {
+      start = DateTime(now.year, now.month, clampedDay);
+      final nextMonth = DateTime(now.year, now.month + 1, 1);
+      final daysInNext = DateTime(nextMonth.year, nextMonth.month + 1, 0).day;
+      final nextDay = clampedDay.clamp(1, daysInNext);
+      end = DateTime(nextMonth.year, nextMonth.month, nextDay, 23, 59, 59, 999)
+          .subtract(const Duration(days: 1));
+    } else {
+      final prevMonth = DateTime(now.year, now.month - 1, 1);
+      final daysInPrev = DateTime(prevMonth.year, prevMonth.month + 1, 0).day;
+      final prevDay = clampedDay.clamp(1, daysInPrev);
+      start = DateTime(prevMonth.year, prevMonth.month, prevDay);
+      end = DateTime(now.year, now.month, clampedDay, 23, 59, 59, 999)
+          .subtract(const Duration(days: 1));
+    }
+
+    return (start, end);
+  }
+
+  /// Dynamic income calculated based on custom cycle date or all-time
+  double getDynamicIncome({String? targetUserId}) {
+    if (_isAllTimeView || !hasCustomStartDay(targetUserId: targetUserId)) {
+      double total = 0.0;
+      for (final t in _transactions) {
+        if (t.isIncome) total += t.amount;
+      }
+      return total;
+    }
+
+    final cycle = getCycleRangeForUser(targetUserId: targetUserId);
+    if (cycle == null) {
+      double total = 0.0;
+      for (final t in _transactions) {
+        if (t.isIncome) total += t.amount;
+      }
+      return total;
+    }
+
+    double total = 0.0;
+    for (final t in _transactions) {
+      final tDate = t.transactionDate.toLocal();
+      if (t.isIncome && !tDate.isBefore(cycle.$1) && !tDate.isAfter(cycle.$2)) {
+        total += t.amount;
+      }
+    }
+    return total;
+  }
+
+  /// Dynamic expense calculated based on custom cycle date or all-time
+  double getDynamicExpense({String? targetUserId}) {
+    if (_isAllTimeView || !hasCustomStartDay(targetUserId: targetUserId)) {
+      double total = 0.0;
+      for (final t in _transactions) {
+        if (t.isExpense) total += t.amount;
+      }
+      return total;
+    }
+
+    final cycle = getCycleRangeForUser(targetUserId: targetUserId);
+    if (cycle == null) {
+      double total = 0.0;
+      for (final t in _transactions) {
+        if (t.isExpense) total += t.amount;
+      }
+      return total;
+    }
+
+    double total = 0.0;
+    for (final t in _transactions) {
+      final tDate = t.transactionDate.toLocal();
+      if (t.isExpense &&
+          !tDate.isBefore(cycle.$1) &&
+          !tDate.isAfter(cycle.$2)) {
+        total += t.amount;
+      }
+    }
+    return total;
+  }
+
+  /// Label for the dynamic period in FinanceSummaryRow
+  String getDynamicPeriodLabel({String? targetUserId}) {
+    if (_isAllTimeView || !hasCustomStartDay(targetUserId: targetUserId)) {
+      return 'Keseluruhan';
+    }
+
+    final cycle = getCycleRangeForUser(targetUserId: targetUserId);
+    if (cycle == null) return 'Keseluruhan';
+
+    final startDay = getStartDayForUser(targetUserId: targetUserId);
+    return 'Tgl $startDay (${cycle.$1.day} ${_shortMonths[cycle.$1.month - 1]} – ${cycle.$2.day} ${_shortMonths[cycle.$2.month - 1]})';
+  }
+
   FinanceProvider() {
     _loadPreferences();
   }
@@ -133,8 +318,9 @@ class FinanceProvider extends ChangeNotifier {
 
   /// All categories available for Income (defaults + custom)
   List<String> get allIncomeCategoryNames {
-    final defaultNames =
-        FinanceCategoryModel.defaultIncomeCategories.map((c) => c.name).toList();
+    final defaultNames = FinanceCategoryModel.defaultIncomeCategories
+        .map((c) => c.name)
+        .toList();
     final set = <String>{...defaultNames, ..._customIncomeCategories};
     // Also include any categories found in historical transactions
     for (final t in _transactions) {
@@ -145,8 +331,9 @@ class FinanceProvider extends ChangeNotifier {
 
   /// All categories available for Expense (defaults + custom)
   List<String> get allExpenseCategoryNames {
-    final defaultNames =
-        FinanceCategoryModel.defaultExpenseCategories.map((c) => c.name).toList();
+    final defaultNames = FinanceCategoryModel.defaultExpenseCategories
+        .map((c) => c.name)
+        .toList();
     final set = <String>{...defaultNames, ..._customExpenseCategories};
     // Also include any categories found in historical transactions
     for (final t in _transactions) {
@@ -252,22 +439,30 @@ class FinanceProvider extends ChangeNotifier {
   }
 
   /// Current Month Net Savings (Income - Expense)
-  double get currentMonthNetSavings =>
-      currentMonthIncome - currentMonthExpense;
+  double get currentMonthNetSavings => currentMonthIncome - currentMonthExpense;
 
   /// Expense Breakdown by Category for Donut Chart
-  List<CategoryBreakdownItem> get categoryExpenseBreakdown {
-    final now = DateTime.now();
+  /// Follows the active dynamic cycle date or all-time setting
+  List<CategoryBreakdownItem> getDynamicCategoryExpenseBreakdown({
+    String? targetUserId,
+  }) {
     final Map<String, double> categoryTotals = {};
+    Iterable<TransactionModel> targetList;
 
-    // Filter current month expenses
-    final monthExpenses = _transactions.where((t) =>
-        t.isExpense &&
-        t.transactionDate.year == now.year &&
-        t.transactionDate.month == now.month);
-
-    final targetList =
-        monthExpenses.isNotEmpty ? monthExpenses : _transactions.where((t) => t.isExpense);
+    if (_isAllTimeView || !hasCustomStartDay(targetUserId: targetUserId)) {
+      targetList = _transactions.where((t) => t.isExpense);
+    } else {
+      final cycle = getCycleRangeForUser(targetUserId: targetUserId);
+      if (cycle == null) {
+        targetList = _transactions.where((t) => t.isExpense);
+      } else {
+        targetList = _transactions.where((t) {
+          if (!t.isExpense) return false;
+          final tDate = t.transactionDate.toLocal();
+          return !tDate.isBefore(cycle.$1) && !tDate.isAfter(cycle.$2);
+        });
+      }
+    }
 
     double totalExp = 0.0;
     for (final t in targetList) {
@@ -283,8 +478,8 @@ class FinanceProvider extends ChangeNotifier {
 
     return sortedEntries.map((entry) {
       final percentage = (entry.value / totalExp) * 100.0;
-      final color = FinanceCategoryModel.getColorForCategory(entry.key,
-          isExpense: true);
+      final color =
+          FinanceCategoryModel.getColorForCategory(entry.key, isExpense: true);
       return CategoryBreakdownItem(
         name: entry.key,
         amount: entry.value,
@@ -293,6 +488,10 @@ class FinanceProvider extends ChangeNotifier {
       );
     }).toList();
   }
+
+  /// Expense Breakdown by Category for Donut Chart (backward compatibility)
+  List<CategoryBreakdownItem> get categoryExpenseBreakdown =>
+      getDynamicCategoryExpenseBreakdown();
 
   /// Fetch overview transactions from server
   Future<void> fetchTransactions({
@@ -421,11 +620,14 @@ class FinanceProvider extends ChangeNotifier {
       );
 
       _transactions.insert(0, newTransaction);
-      _transactions.sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
+      _transactions
+          .sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
 
       // Also prepend to paged transactions if loaded
       _pagedTransactions.removeWhere((t) => t.id == newTransaction.id);
       _pagedTransactions.insert(0, newTransaction);
+      _pagedTransactions
+          .sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
 
       notifyListeners();
       _syncWidget();
@@ -469,12 +671,16 @@ class FinanceProvider extends ChangeNotifier {
       final index = _transactions.indexWhere((t) => t.id == transactionId);
       if (index != -1) {
         _transactions[index] = updated;
-        _transactions.sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
+        _transactions
+            .sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
       }
 
-      final pagedIndex = _pagedTransactions.indexWhere((t) => t.id == transactionId);
+      final pagedIndex =
+          _pagedTransactions.indexWhere((t) => t.id == transactionId);
       if (pagedIndex != -1) {
         _pagedTransactions[pagedIndex] = updated;
+        _pagedTransactions
+            .sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
       }
 
       notifyListeners();
@@ -532,20 +738,54 @@ class FinanceProvider extends ChangeNotifier {
 
   /// Get calculated progress for all budgets
   List<FinanceBudgetProgress> getBudgetProgressList({String? currentUserId}) {
-    return _budgets
-        .map((b) => b.calculateProgress(_transactions, currentUserId: currentUserId))
-        .toList();
+    final List<FinanceBudgetProgress> list = [];
+    for (int i = 0; i < _budgets.length; i++) {
+      final b = _budgets[i];
+      final rolled = b.checkAndRollover();
+      if (rolled.startDate != b.startDate || rolled.endDate != b.endDate) {
+        _budgets[i] = rolled;
+        // Background sync to DB so server is also updated
+        _repository
+            .updateBudget(
+              rolled.id,
+              category: rolled.category,
+              amount: rolled.amount,
+              periodType: rolled.periodType,
+              startDate: rolled.startDate,
+              endDate: rolled.endDate,
+              repeatType: rolled.repeatType,
+              monthlyStartDay: rolled.monthlyStartDay,
+              isShared: rolled.isShared,
+              partnerId: rolled.partnerId,
+            )
+            .then((_) {},
+                onError: (e) => debugPrint('Error syncing rollover: $e'));
+      }
+      list.add(rolled.calculateProgress(_transactions,
+          currentUserId: currentUserId));
+    }
+    return list;
   }
 
   /// Total remaining budget for all monthly budgets:
-  /// (Total Monthly Budget Allocated - Total Expenses of the Month regardless of category)
+  /// Uses active cycle progress so custom start day budgets (e.g. tanggal 25) are respected
   double totalMonthlyBudgetRemaining({String? currentUserId}) {
-    final monthlyBudgets =
-        _budgets.where((b) => b.periodType == 'monthly').toList();
-    if (monthlyBudgets.isEmpty) return 0.0;
+    final progressList = getBudgetProgressList(currentUserId: currentUserId);
+    final monthlyProgress =
+        progressList.where((p) => p.budget.periodType == 'monthly').toList();
+    if (monthlyProgress.isEmpty) return 0.0;
 
-    final totalBudget = monthlyBudgets.fold(0.0, (sum, b) => sum + b.amount);
-    return totalBudget - currentMonthExpense;
+    // If there is an 'all categories' budget, its remaining is the canonical remaining
+    final allCategoriesProgress =
+        monthlyProgress.where((p) => p.budget.isAllCategories).firstOrNull;
+    if (allCategoriesProgress != null) {
+      return allCategoriesProgress.remaining;
+    }
+
+    final totalBudget =
+        monthlyProgress.fold(0.0, (sum, p) => sum + p.budget.amount);
+    final totalSpent = monthlyProgress.fold(0.0, (sum, p) => sum + p.spent);
+    return math.max(0.0, totalBudget - totalSpent);
   }
 
   /// Total allocated budget for all monthly budgets
@@ -661,14 +901,18 @@ class FinanceProvider extends ChangeNotifier {
       final progress = budget.calculateProgress(_transactions);
 
       // Alert 80%
-      if (progress.percentage >= 80.0 && !budget.alert80Notified && !progress.isOverBudget) {
+      if (progress.percentage >= 80.0 &&
+          !budget.alert80Notified &&
+          !progress.isOverBudget) {
         try {
           await NotificationService.showInstantNotification(
             id: budget.id.hashCode & 0x7FFFFFFF,
             title: '⚠️ Peringatan Budget: ${budget.category}',
-            body: 'Pengeluaran "${budget.category}" sudah mencapai ${progress.percentage.toStringAsFixed(0)}% dari batas budget!',
+            body:
+                'Pengeluaran "${budget.category}" sudah mencapai ${progress.percentage.toStringAsFixed(0)}% dari batas budget!',
           );
-          await _repository.updateBudgetNotificationFlags(budget.id, alert80: true);
+          await _repository.updateBudgetNotificationFlags(budget.id,
+              alert80: true);
           _budgets[i] = budget.copyWith(alert80Notified: true);
         } catch (err) {
           debugPrint('Notification 80% error: $err');
@@ -681,9 +925,11 @@ class FinanceProvider extends ChangeNotifier {
           await NotificationService.showInstantNotification(
             id: (budget.id.hashCode + 1) & 0x7FFFFFFF,
             title: '🚨 Budget Terlampaui: ${budget.category}',
-            body: 'Pengeluaran "${budget.category}" sudah melebihi batas budget yang ditetapkan!',
+            body:
+                'Pengeluaran "${budget.category}" sudah melebihi batas budget yang ditetapkan!',
           );
-          await _repository.updateBudgetNotificationFlags(budget.id, alert100: true);
+          await _repository.updateBudgetNotificationFlags(budget.id,
+              alert100: true);
           _budgets[i] = budget.copyWith(alert100Notified: true);
         } catch (err) {
           debugPrint('Notification 100% error: $err');

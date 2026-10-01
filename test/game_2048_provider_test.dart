@@ -824,7 +824,7 @@ void main() {
 
       await provider.completeAnimation();
       expect(provider.sessionClaimedMilestones, {128});
-      expect(provider.sessionPointsEarned, 2);
+      expect(provider.sessionPointsEarned, 1);
 
       provider.clearNewlyUnlockedMilestone();
       expect(provider.newlyUnlockedMilestone, isNull);

@@ -425,7 +425,7 @@ void main() {
 
     expect(find.text('Lanjutkan'), findsOneWidget);
     expect(find.text('Mulai Baru'), findsOneWidget);
-    expect(find.text('Hingga +120 poin per game'), findsOneWidget);
+    expect(find.text('Hingga +61 poin per game'), findsOneWidget);
     expect(assetImages, findsNWidgets(2));
 
     await tester.tap(find.text('Mulai Baru'));
@@ -925,17 +925,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Hingga +120 poin per game'), findsOneWidget);
+    expect(find.text('Hingga +61 poin per game'), findsOneWidget);
 
-    await tester.tap(find.text('Hingga +120 poin per game'));
+    await tester.tap(find.text('Hingga +61 poin per game'));
     await tester.pumpAndSettle();
 
     expect(find.text('Poin 2048'), findsOneWidget);
     expect(find.text('Total Poin Permainan Ini'), findsOneWidget);
-    expect(find.text('0 / 120 Poin'), findsOneWidget);
+    expect(find.text('0 / 61 Poin'), findsOneWidget);
     expect(find.text('Ubin 128'), findsOneWidget);
     expect(find.text('Ubin 2048'), findsOneWidget);
-    expect(find.text('+20 Poin'), findsOneWidget);
+    expect(find.text('+10 Poin'), findsOneWidget);
     expect(find.text('Mengerti'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Mengerti'));
@@ -958,9 +958,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 128 (2 pts) + 256 (3 pts) = 5 pts
-    expect(find.text('5 / 120 Poin'), findsOneWidget);
-    expect(find.text('2 dari 7 ubin milestone berhasil dicapai'), findsOneWidget);
+    // 128 (1 pt) + 256 (2 pts) = 3 pts
+    expect(find.text('3 / 61 Poin'), findsOneWidget);
+    expect(
+        find.text('2 dari 7 ubin milestone berhasil dicapai'), findsOneWidget);
     expect(find.text('Diklaim'), findsNWidgets(2));
     expect(find.text('Belum'), findsNWidgets(5));
   });
@@ -987,6 +988,114 @@ void main() {
 
     // Milestone banner pops up
     expect(find.text('Ubin 128 Tercapai!'), findsOneWidget);
-    expect(find.text('+2 Poin masuk ke akunmu'), findsOneWidget);
+    expect(find.text('+1 Poin masuk ke akunmu'), findsOneWidget);
+  });
+
+  testWidgets(
+      'milestone banner stays mounted and does not retrigger on subsequent merges',
+      (WidgetTester tester) async {
+    final provider = Game2048Provider(
+      engine: _WidgetScriptedEngine(
+        initialTiles: [
+          _screenTile(1, 64),
+          _screenTile(2, 64),
+          _screenTile(4, 2),
+          _screenTile(5, 2),
+        ],
+        results: [
+          _screenResult(
+            tiles: [_screenTile(3, 128), _screenTile(4, 2), _screenTile(5, 2)],
+            scoreGained: 128,
+          ),
+          _screenResult(
+            tiles: [_screenTile(3, 128), _screenTile(6, 4)],
+            scoreGained: 4,
+          ),
+        ],
+      ),
+      storage: _WidgetMemoryStorage(),
+      repository: _WidgetRepository(),
+    );
+    await provider.newGame();
+    await tester.pumpWidget(_screenHarness(provider));
+    await tester.pumpAndSettle();
+
+    // 1. First move unlocks milestone 128
+    provider.swipe(Game2048Direction.left);
+    await tester.pump();
+    expect(find.text('Ubin 128 Tercapai!'), findsOneWidget);
+    expect(find.text('+1 Poin masuk ke akunmu'), findsOneWidget);
+
+    // Complete animation and save
+    await provider.completeAnimation();
+    await tester.pump();
+    expect(find.text('Ubin 128 Tercapai!'), findsOneWidget);
+
+    // 2. Subsequent move merges other blocks (2+2 -> 4)
+    provider.swipe(Game2048Direction.up);
+    await tester.pump();
+    expect(find.text('Ubin 128 Tercapai!'), findsOneWidget);
+
+    await provider.completeAnimation();
+    await tester.pump();
+    expect(find.text('Ubin 128 Tercapai!'), findsOneWidget);
+
+    // Advance time past dismiss timer (3800ms) and reverse animation (350ms)
+    await tester.pump(const Duration(milliseconds: 3800));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    // Banner dismissed cleanly
+    expect(find.text('Ubin 128 Tercapai!'), findsNothing);
+    expect(provider.newlyUnlockedMilestone, isNull);
+  });
+
+  testWidgets(
+      'undo button becomes enabled after a move settles and restores previous state',
+      (WidgetTester tester) async {
+    final provider = Game2048Provider(
+      engine: _WidgetScriptedEngine(
+        initialTiles: [
+          _screenTile(1, 2),
+          _screenTile(2, 2),
+        ],
+        results: [
+          _screenResult(
+            tiles: [_screenTile(3, 4)],
+            scoreGained: 4,
+          ),
+        ],
+      ),
+      storage: _WidgetMemoryStorage(),
+      repository: _WidgetRepository(),
+    );
+    await provider.newGame();
+    await tester.pumpWidget(_screenHarness(provider));
+    await tester.pumpAndSettle();
+
+    // Before any move, undos left is 3, but snapshots is empty -> button is disabled
+    expect(find.text('Urungkan'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+
+    // Make a move
+    provider.swipe(Game2048Direction.left);
+    await tester.pump();
+    expect(provider.isInputLocked, isTrue);
+
+    // Animation settles
+    await provider.completeAnimation();
+    await tester.pump();
+    expect(provider.isInputLocked, isFalse);
+
+    // Undo button must now be enabled and responsive
+    await tester.ensureVisible(find.text('Urungkan'));
+    await tester.tap(find.text('Urungkan'));
+    await tester.pumpAndSettle();
+
+    // After undoing, undos count is decremented to 2 and score restored to 0
+    expect(provider.undosLeft, 2);
+    expect(provider.score, 0);
+    expect(find.text('Urungkan'), findsOneWidget);
   });
 }
+

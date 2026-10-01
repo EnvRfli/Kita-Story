@@ -92,6 +92,75 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
     return buffer.toString().split('').reversed.join('');
   }
 
+  static const List<String> _monthNames = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember'
+  ];
+
+  String _formatDisplayDate(DateTime dt) {
+    final now = DateTime.now();
+    final isToday =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final isYesterday = dt.year == now.year &&
+        dt.month == now.month &&
+        dt.day == now.subtract(const Duration(days: 1)).day;
+
+    final formattedDate = '${dt.day} ${_monthNames[dt.month - 1]} ${dt.year}';
+    if (isToday) {
+      return 'Hari ini, $formattedDate';
+    } else if (isYesterday) {
+      return 'Kemarin, $formattedDate';
+    }
+    return formattedDate;
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 2),
+      helpText: 'Pilih Tanggal Transaksi',
+      cancelText: 'Batal',
+      confirmText: 'Pilih',
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: Color(0xFFFF7A00),
+            onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: Color(0xFF1E293B),
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDate = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _selectedDate.hour,
+          _selectedDate.minute,
+          _selectedDate.second,
+        );
+      });
+    }
+  }
+
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -178,6 +247,11 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
         _selectedCategory = categories.first;
       }
     }
+
+    final now = DateTime.now();
+    final isToday = _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
 
     return Container(
       decoration: const BoxDecoration(
@@ -302,7 +376,95 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 5. Kategori Chips + Add Custom Category Button
+                  // 5. Tanggal Transaksi (Default: Hari ini)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Tanggal Transaksi',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      if (!isToday)
+                        InkWell(
+                          onTap: () {
+                            setState(() => _selectedDate = DateTime.now());
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF4EB),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Set Hari Ini',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFFF7A00),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: _pickDate,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xFFE2E8F0),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF4EB),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.calendar_today_rounded,
+                              color: Color(0xFFFF7A00),
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _formatDisplayDate(_selectedDate),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Color(0xFF94A3B8),
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 6. Kategori Chips + Add Custom Category Button
                   const Text(
                     'Kategori',
                     style: TextStyle(

@@ -157,4 +157,51 @@ class FinanceCategoryModel {
     ];
     return colors[hash % colors.length];
   }
+
+  /// Icon generator for category name with smart fallback
+  static IconData getIconForCategory(String name, {bool isExpense = true}) {
+    final lower = name.toLowerCase().trim();
+    if (lower.contains('makan') || lower.contains('minum') || lower.contains('food')) {
+      return Icons.restaurant_rounded;
+    }
+    if (lower.contains('belanja') || lower.contains('shop')) {
+      return Icons.shopping_bag_rounded;
+    }
+    if (lower.contains('skin') || lower.contains('make') || lower.contains('beauty')) {
+      return Icons.face_retouching_natural_rounded;
+    }
+    if (lower.contains('trans') || lower.contains('bensin') || lower.contains('ojol') || lower.contains('grab') || lower.contains('gojek')) {
+      return Icons.directions_car_rounded;
+    }
+    if (lower.contains('sehat') || lower.contains('obat') || lower.contains('dokter') || lower.contains('medis')) {
+      return Icons.local_hospital_rounded;
+    }
+    if (lower.contains('kos') || lower.contains('sewa') || lower.contains('listrik') || lower.contains('air') || lower.contains('tagihan')) {
+      return Icons.home_rounded;
+    }
+    if (lower.contains('hiburan') || lower.contains('jalan') || lower.contains('nonton') || lower.contains('game')) {
+      return Icons.sports_esports_rounded;
+    }
+    if (lower.contains('gaji') || lower.contains('salary')) {
+      return Icons.payments_rounded;
+    }
+    if (lower.contains('bonus')) {
+      return Icons.card_giftcard_rounded;
+    }
+    if (lower.contains('investasi') || lower.contains('saham') || lower.contains('reksa') || lower.contains('crypto')) {
+      return Icons.trending_up_rounded;
+    }
+    if (lower.contains('hadiah') || lower.contains('gift')) {
+      return Icons.redeem_rounded;
+    }
+
+    final pool = isExpense ? defaultExpenseCategories : defaultIncomeCategories;
+    for (final cat in pool) {
+      if (cat.name.toLowerCase() == lower && cat.icon != null) {
+        return cat.icon!;
+      }
+    }
+
+    return isExpense ? Icons.receipt_long_rounded : Icons.account_balance_wallet_rounded;
+  }
 }

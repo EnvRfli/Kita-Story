@@ -13,7 +13,7 @@ class Game2048CelebrationOverlay extends StatefulWidget {
     required this.onContinue,
     this.elapsedSeconds = 0,
     this.movesCount = 0,
-    this.pointsEarned = 20,
+    this.pointsEarned = 10,
     this.onHome,
   });
 

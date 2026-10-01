@@ -45,7 +45,7 @@ class Game2048GamificationBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final earned = totalEarnedPoints;
-    const maxPoints = 120;
+    const maxPoints = 61;
     final progress = (earned / maxPoints).clamp(0.0, 1.0);
 
     return SafeArea(
@@ -106,7 +106,7 @@ class Game2048GamificationBottomSheet extends StatelessWidget {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'Kumpulkan hingga +120 poin di setiap permainan',
+                          'Kumpulkan hingga +61 poin di setiap permainan',
                           style: TextStyle(
                             color: Color(0xFF64748B),
                             fontSize: 13,

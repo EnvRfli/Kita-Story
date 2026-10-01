@@ -45,7 +45,7 @@ class _Game2048ScreenState extends State<Game2048Screen> {
                         elapsedSeconds: provider.elapsedSeconds,
                         movesCount: provider.moveCount,
                         pointsEarned:
-                            Game2048Repository.rewardPointsFor(2048) ?? 20,
+                            Game2048Repository.rewardPointsFor(2048) ?? 10,
                         onContinue: provider.continueAfter2048,
                         onHome: () => _finishAndExit(context, provider),
                       ),
@@ -64,7 +64,8 @@ class _Game2048ScreenState extends State<Game2048Screen> {
                             : () => _finishAndExit(context, provider),
                       ),
                     if (provider.newlyUnlockedMilestone != null &&
-                        provider.status == Game2048Status.playing)
+                        provider.status != Game2048Status.gameOver &&
+                        provider.status != Game2048Status.celebrating2048)
                       Positioned(
                         top: 12,
                         left: 16,
@@ -746,6 +747,7 @@ class _MilestoneNotificationBannerState
   late final Animation<double> _slideAnimation;
   late final Animation<double> _opacityAnimation;
   Timer? _dismissTimer;
+  bool _isDismissing = false;
 
   @override
   void initState() {
@@ -766,7 +768,9 @@ class _MilestoneNotificationBannerState
   }
 
   void _dismiss() {
-    if (!mounted) return;
+    if (!mounted || _isDismissing) return;
+    _isDismissing = true;
+    _dismissTimer?.cancel();
     _controller.reverse().then((_) {
       if (mounted) widget.onDismiss();
     });

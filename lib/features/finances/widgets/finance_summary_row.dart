@@ -5,12 +5,16 @@ class FinanceSummaryRow extends StatelessWidget {
   final double income;
   final double expense;
   final bool isBalanceVisible;
+  final VoidCallback? onIncomeTap;
+  final VoidCallback? onExpenseTap;
 
   const FinanceSummaryRow({
     super.key,
     required this.income,
     required this.expense,
     this.isBalanceVisible = true,
+    this.onIncomeTap,
+    this.onExpenseTap,
   });
 
   @override
@@ -28,6 +32,7 @@ class FinanceSummaryRow extends StatelessWidget {
             iconBgColor: const Color(0xFFE0F7F6),
             label: 'Pemasukan',
             nominal: isBalanceVisible ? formattedIncome : '••••••••',
+            onTap: onIncomeTap,
           ),
         ),
         const SizedBox(width: 14),
@@ -40,6 +45,7 @@ class FinanceSummaryRow extends StatelessWidget {
             iconBgColor: const Color(0xFFFFECEB),
             label: 'Pengeluaran',
             nominal: isBalanceVisible ? formattedExpense : '••••••••',
+            onTap: onExpenseTap,
           ),
         ),
       ],
@@ -52,9 +58,9 @@ class FinanceSummaryRow extends StatelessWidget {
     required Color iconBgColor,
     required String label,
     required String nominal,
+    VoidCallback? onTap,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -70,49 +76,73 @@ class FinanceSummaryRow extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Icon Circle
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 18,
-            ),
-          ),
-          const SizedBox(height: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          splashColor: iconColor.withValues(alpha: 0.08),
+          highlightColor: iconColor.withValues(alpha: 0.04),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: Icon Circle + Subtle Chevron Affordance
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: iconBgColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: iconColor,
+                        size: 18,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: onTap != null
+                          ? const Color(0xFF94A3B8)
+                          : Colors.transparent,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
 
-          // Label
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 4),
+                // Label
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 4),
 
-          // Nominal
-          Text(
-            nominal,
-            style: const TextStyle(
-              fontSize: 15.5,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E293B),
-              letterSpacing: -0.3,
+                // Nominal
+                Text(
+                  nominal,
+                  style: const TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1E293B),
+                    letterSpacing: -0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-        ],
+        ),
       ),
     );
   }

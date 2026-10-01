@@ -93,14 +93,14 @@ void main() {
       expect(
         Game2048Repository.milestonePoints,
         const {
-          128: 2,
-          256: 3,
-          512: 5,
-          1024: 10,
-          2048: 20,
-          4096: 30,
-          8192: 50,
-          16384: 50,
+          128: 1,
+          256: 2,
+          512: 3,
+          1024: 5,
+          2048: 10,
+          4096: 15,
+          8192: 25,
+          16384: 25,
         },
       );
       expect(
@@ -120,7 +120,7 @@ void main() {
         Game2048Repository.milestoneCandidatesFor(32768),
         {128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768},
       );
-      expect(Game2048Repository.rewardPointsFor(32768), 50);
+      expect(Game2048Repository.rewardPointsFor(32768), 25);
       expect(Game2048Repository.rewardPointsFor(300), isNull);
     });
 
@@ -151,13 +151,13 @@ void main() {
       expect(sorted.first.userId, 'valid');
     });
 
-    test('verifies milestone rewards sum up to 120 points for standard 7 milestones', () {
+    test('verifies milestone rewards sum up to 61 points for standard 7 milestones', () {
       const standardMilestones = [128, 256, 512, 1024, 2048, 4096, 8192];
       var total = 0;
       for (final m in standardMilestones) {
         total += Game2048Repository.rewardPointsFor(m) ?? 0;
       }
-      expect(total, 120);
+      expect(total, 61);
     });
 
     test('fetchClaimedMilestones returns empty set safely on empty userId', () async {
@@ -167,14 +167,14 @@ void main() {
 
     test('calculatePointsForMilestones calculates accumulated points correctly', () {
       expect(Game2048Repository.calculatePointsForMilestones([]), 0);
-      // 128 (2) + 256 (3) = 5
-      expect(Game2048Repository.calculatePointsForMilestones([128, 256]), 5);
-      // Candidates up to 2048: 128(2) + 256(3) + 512(5) + 1024(10) + 2048(20) = 40
+      // 128 (1) + 256 (2) = 3
+      expect(Game2048Repository.calculatePointsForMilestones([128, 256]), 3);
+      // Candidates up to 2048: 128(1) + 256(2) + 512(3) + 1024(5) + 2048(10) = 21
       final candidates2048 = Game2048Repository.milestoneCandidatesFor(2048);
-      expect(Game2048Repository.calculatePointsForMilestones(candidates2048), 40);
-      // All 7 standard milestones = 120
+      expect(Game2048Repository.calculatePointsForMilestones(candidates2048), 21);
+      // All 7 standard milestones = 61
       final all7 = [128, 256, 512, 1024, 2048, 4096, 8192];
-      expect(Game2048Repository.calculatePointsForMilestones(all7), 120);
+      expect(Game2048Repository.calculatePointsForMilestones(all7), 61);
     });
 
     test('claimMilestones filters candidate milestones to only valid milestone tiles', () async {

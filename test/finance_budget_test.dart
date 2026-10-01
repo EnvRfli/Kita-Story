@@ -266,5 +266,51 @@ void main() {
       expect(totalMonthExpenses, 325000);
       expect(totalRemainingMonth, 475000);
     });
+
+    test(
+        'calculateProgress includes early morning transactions (e.g. 03:00 AM) on reset start date',
+        () {
+      final budget = FinanceBudgetModel(
+        id: 'b_reset',
+        userId: 'user1',
+        category: 'Semua Pengeluaran',
+        amount: 2000000,
+        periodType: 'monthly',
+        monthlyStartDay: 25,
+        startDate: DateTime(2026, 9, 25),
+        endDate: DateTime(2026, 10, 24),
+      );
+
+      final transactions = [
+        // Transaction entered at 3:00 AM on the reset day (Sept 25)
+        TransactionModel(
+          id: 't_subuh',
+          userId: 'user1',
+          type: 'expense',
+          title: 'Makan Sahur / Subuh',
+          category: 'Makan dan Minum',
+          amount: 50000,
+          transactionDate: DateTime(2026, 9, 25, 3, 0, 0),
+        ),
+        // Transaction entered at 10:00 AM on the reset day
+        TransactionModel(
+          id: 't_siang',
+          userId: 'user1',
+          type: 'expense',
+          title: 'Belanja Pagi',
+          category: 'Belanja',
+          amount: 150000,
+          transactionDate: DateTime(2026, 9, 25, 10, 0, 0),
+        ),
+      ];
+
+      final progress =
+          budget.calculateProgress(transactions, currentUserId: 'user1');
+
+      // Both transactions should be counted, totaling 200,000
+      expect(progress.spent, 200000);
+      expect(progress.remaining, 1800000);
+      expect(progress.percentage, 10.0);
+    });
   });
 }
