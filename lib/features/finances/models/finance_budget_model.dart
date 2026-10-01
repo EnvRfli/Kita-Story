@@ -63,16 +63,16 @@ class FinanceBudgetModel {
     String? currentUserId,
   }) {
     double spent = 0.0;
-    final startUtc = DateTime.utc(
+    final startLocal = DateTime(
         startDate.year, startDate.month, startDate.day, 0, 0, 0);
-    final endUtc = DateTime.utc(
+    final endLocal = DateTime(
         endDate.year, endDate.month, endDate.day, 23, 59, 59, 999);
 
     for (final t in transactions) {
       if (!t.isExpense) continue;
 
-      final tDate = t.transactionDate.toUtc();
-      if (tDate.isBefore(startUtc) || tDate.isAfter(endUtc)) continue;
+      final tDate = t.transactionDate.toLocal();
+      if (tDate.isBefore(startLocal) || tDate.isAfter(endLocal)) continue;
 
       if (!matchesCategory(t.category)) continue;
 
