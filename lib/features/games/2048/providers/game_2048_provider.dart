@@ -72,7 +72,10 @@ class Game2048Provider extends ChangeNotifier {
   int? _newlyUnlockedMilestone;
   int? get newlyUnlockedMilestone => _newlyUnlockedMilestone;
   void clearNewlyUnlockedMilestone() {
-    _newlyUnlockedMilestone = null;
+    if (_newlyUnlockedMilestone != null) {
+      _newlyUnlockedMilestone = null;
+      notifyListeners();
+    }
   }
 
   Game2048Status _status = Game2048Status.loading;
@@ -297,8 +300,13 @@ class Game2048Provider extends ChangeNotifier {
     final queuesFinalization =
         finishesRun && (autoFinalizeGameOver || _isEndRunRequested);
     if (queuesFinalization) _queuePendingResultWrite();
+    if (!queuesFinalization) {
+      _status = statusAfterSave;
+      notifyListeners();
+    }
     await _saveActive(
       queuesFinalization ? Game2048Status.saving : statusAfterSave,
+      indicateSaving: queuesFinalization,
     );
     await claimPendingMilestones();
     if (finishesRun && autoFinalizeGameOver && !_isEndRunRequested) {
@@ -353,6 +361,7 @@ class Game2048Provider extends ChangeNotifier {
     _hasCelebrated2048 = snapshot.hasCelebrated2048;
     _undosLeft--;
     _resumeElapsed();
+    notifyListeners();
     await _saveActive(Game2048Status.playing);
     return true;
   }
@@ -372,7 +381,7 @@ class Game2048Provider extends ChangeNotifier {
       return;
     }
     if (_endRunFuture != null && _pendingResultWrite == null) return;
-    await _saveActive(_status);
+    await _saveActive(_status, indicateSaving: true);
   }
 
   Future<void> endRun() => _endRunWithStatus(Game2048Status.gameOver);
@@ -512,18 +521,26 @@ class Game2048Provider extends ChangeNotifier {
     }
   }
 
-  Future<void> _saveActive(Game2048Status statusAfterSave) async {
-    _status = Game2048Status.saving;
-    notifyListeners();
+  Future<void> _saveActive(
+    Game2048Status statusAfterSave, {
+    bool indicateSaving = false,
+  }) async {
+    if (indicateSaving && _status != Game2048Status.saving) {
+      _status = Game2048Status.saving;
+      notifyListeners();
+    }
     try {
       await _storage.save(_snapshot(includeUndoHistory: true));
       await _storage.saveBestScore(_bestScore);
-      _status = statusAfterSave;
+      if (_status != statusAfterSave) {
+        _status = statusAfterSave;
+        notifyListeners();
+      }
     } on Object {
       _pauseElapsed();
       _status = Game2048Status.error;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   void _resetEmptyGame(int bestScore) {

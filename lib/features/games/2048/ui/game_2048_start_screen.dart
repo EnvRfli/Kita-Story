@@ -309,7 +309,7 @@ class _Game2048StartScreenState extends State<Game2048StartScreen> {
                                 ),
                                 SizedBox(width: 6),
                                 Text(
-                                  'Hingga +120 poin per game',
+                                  'Hingga +61 poin per game',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w800,

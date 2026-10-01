@@ -75,14 +75,14 @@ class Game2048Repository {
   Game2048Repository({SupabaseClient? client}) : _providedClient = client;
 
   static const Map<int, int> milestonePoints = {
-    128: 2,
-    256: 3,
-    512: 5,
-    1024: 10,
-    2048: 20,
-    4096: 30,
-    8192: 50,
-    16384: 50,
+    128: 1,
+    256: 2,
+    512: 3,
+    1024: 5,
+    2048: 10,
+    4096: 15,
+    8192: 25,
+    16384: 25,
   };
 
   final SupabaseClient? _providedClient;
@@ -304,7 +304,7 @@ class Game2048Repository {
   static int? rewardPointsFor(int milestone) {
     final configuredReward = milestonePoints[milestone];
     if (configuredReward != null) return configuredReward;
-    if (milestone >= 8192 && (milestone & (milestone - 1)) == 0) return 50;
+    if (milestone >= 8192 && (milestone & (milestone - 1)) == 0) return 25;
     return null;
   }
 
