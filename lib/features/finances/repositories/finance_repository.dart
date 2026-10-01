@@ -449,4 +449,36 @@ class FinanceRepository {
   Future<void> deleteBudget(String budgetId) async {
     await _client.from('finance_budgets').delete().eq('id', budgetId);
   }
+
+  /// Get user's configured summary start day (e.g. 25, or null if all-time default)
+  Future<int?> getSummaryStartDay(String userId) async {
+    try {
+      final response = await _client
+          .from('user_finance_settings')
+          .select('summary_start_day')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (response != null && response['summary_start_day'] != null) {
+        return (response['summary_start_day'] as num).toInt();
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Note: user_finance_settings query fallback ($e)');
+      return null;
+    }
+  }
+
+  /// Save or update user's summary start day in Supabase
+  Future<void> saveSummaryStartDay(String userId, int? startDay) async {
+    try {
+      await _client.from('user_finance_settings').upsert({
+        'user_id': userId,
+        'summary_start_day': startDay,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Note: user_finance_settings upsert fallback ($e)');
+    }
+  }
 }

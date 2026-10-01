@@ -5,11 +5,13 @@ import '../providers/finance_provider.dart';
 class FinanceCategoryDonutChart extends StatelessWidget {
   final List<CategoryBreakdownItem> breakdown;
   final bool showContainer;
+  final String? periodLabel;
 
   const FinanceCategoryDonutChart({
     super.key,
     required this.breakdown,
     this.showContainer = true,
+    this.periodLabel,
   });
 
   @override
@@ -21,15 +23,43 @@ class FinanceCategoryDonutChart extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section Title
-          const Text(
-            'Kategori Pengeluaran',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E293B),
-              letterSpacing: -0.2,
-            ),
+          // Section Title with Dynamic Period Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                'Kategori Pengeluaran',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E293B),
+                  letterSpacing: -0.2,
+                ),
+              ),
+              if (periodLabel != null && periodLabel!.isNotEmpty)
+                Flexible(
+                  child: Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      periodLabel!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 14),
 

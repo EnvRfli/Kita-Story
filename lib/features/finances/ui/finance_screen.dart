@@ -11,6 +11,8 @@ import '../widgets/transaction_card.dart';
 import '../widgets/bottom_sheets/add_transaction_bottom_sheet.dart';
 import '../widgets/bottom_sheets/finance_filter_bottom_sheet.dart';
 import '../widgets/bottom_sheets/transaction_detail_bottom_sheet.dart';
+import '../widgets/bottom_sheets/set_summary_date_bottom_sheet.dart';
+import '../widgets/finance_summary_onboarding_overlay.dart';
 
 import 'dart:async';
 import '../../../core/services/finance_widget_service.dart';
@@ -36,6 +38,7 @@ class FinanceScreen extends StatefulWidget {
 class _FinanceScreenState extends State<FinanceScreen> {
   FinanceFilterModel _mainFilter = const FinanceFilterModel();
   StreamSubscription<String>? _widgetActionSubscription;
+  final GlobalKey _summaryControlKey = GlobalKey();
 
   @override
   void initState() {
@@ -49,10 +52,21 @@ class _FinanceScreenState extends State<FinanceScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _loadData();
-      final action = widget.initialAction ??
-          await FinanceWidgetService.getInitialAction();
+      final action =
+          widget.initialAction ?? await FinanceWidgetService.getInitialAction();
       if (action != null && mounted) {
         _handleAction(action);
+      }
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      final myUid = auth.currentUserProfile?.id;
+      final isPartner = widget.isPartnerMode ||
+          (widget.targetUserId != null && widget.targetUserId != myUid);
+      if (!isPartner) {
+        FinanceSummaryOnboardingOverlay.checkAndShow(
+          context,
+          targetKey: _summaryControlKey,
+        );
       }
     });
   }
@@ -77,13 +91,16 @@ class _FinanceScreenState extends State<FinanceScreen> {
     final partnerId = auth.currentUserProfile?.partnerId;
 
     final financeProvider = context.read<FinanceProvider>();
+    if (uid != null) {
+      financeProvider.fetchSummarySettings(uid);
+    }
     financeProvider.fetchTransactions(
-          targetUserId: uid,
-        );
+      targetUserId: uid,
+    );
     financeProvider.fetchBudgets(
-          targetUserId: uid,
-          partnerId: partnerId,
-        );
+      targetUserId: uid,
+      partnerId: partnerId,
+    );
   }
 
   bool _isModalOpen = false;
@@ -122,6 +139,32 @@ class _FinanceScreenState extends State<FinanceScreen> {
         'partnerName': widget.partnerName,
         'isPartnerMode': widget.isPartnerMode,
       },
+    );
+  }
+
+  void _navigateToBreakdown(String type) {
+    final auth = context.read<AuthProvider>();
+    final myUid = auth.currentUserProfile?.id;
+    final uid = widget.targetUserId ?? myUid;
+    final isPartner = widget.isPartnerMode ||
+        (widget.targetUserId != null && widget.targetUserId != myUid);
+    context.push(
+      '/finance/breakdown',
+      extra: {
+        'type': type,
+        'targetUserId': uid,
+        'partnerName': widget.partnerName,
+        'isPartnerMode': isPartner,
+      },
+    );
+  }
+
+  void _openSetSummaryDate(String userId) {
+    final provider = context.read<FinanceProvider>();
+    SetSummaryDateBottomSheet.show(
+      context,
+      userId: userId,
+      currentStartDay: provider.getStartDayForUser(targetUserId: userId),
     );
   }
 
@@ -252,22 +295,170 @@ class _FinanceScreenState extends State<FinanceScreen> {
                       ),
                       const SizedBox(height: 16),
 
+                      // Control Header Bar for Summary (Target for Onboarding)
+                      Container(
+                        key: _summaryControlKey,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 2),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Badge info of active period
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: provider.isAllTimeView ||
+                                        !provider.hasCustomStartDay(
+                                            targetUserId: widget.targetUserId ?? myUid)
+                                    ? const Color(0xFFF1F5F9)
+                                    : const Color(0xFFFF7A00)
+                                        .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    provider.isAllTimeView ||
+                                            !provider.hasCustomStartDay(
+                                                targetUserId: widget.targetUserId ?? myUid)
+                                        ? Icons.all_inclusive_rounded
+                                        : Icons.calendar_today_rounded,
+                                    size: 13,
+                                    color: provider.isAllTimeView ||
+                                            !provider.hasCustomStartDay(
+                                                targetUserId: widget.targetUserId ?? myUid)
+                                        ? const Color(0xFF64748B)
+                                        : const Color(0xFFFF7A00),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    provider.getDynamicPeriodLabel(
+                                        targetUserId: widget.targetUserId ?? myUid),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: provider.isAllTimeView ||
+                                              !provider.hasCustomStartDay(
+                                                  targetUserId: widget.targetUserId ?? myUid)
+                                          ? const Color(0xFF64748B)
+                                          : const Color(0xFFFF7A00),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Action buttons: Quick Toggle & Settings
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (provider.hasCustomStartDay(
+                                    targetUserId: widget.targetUserId ?? myUid)) ...[
+                                  InkWell(
+                                    onTap: () =>
+                                        provider.toggleSummaryViewMode(),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.swap_horiz_rounded,
+                                            size: 14,
+                                            color: Color(0xFF475569),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            provider.isAllTimeView
+                                                ? 'Lihat Siklus'
+                                                : 'Semua',
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF475569),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (!isPartner) const SizedBox(width: 6),
+                                ],
+                                // Atur Tanggal Button (hanya tampil jika bukan akun pasangan)
+                                if (!isPartner && (widget.targetUserId ?? myUid) != null)
+                                  InkWell(
+                                    onTap: () => _openSetSummaryDate(
+                                        (widget.targetUserId ?? myUid)!),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.tune_rounded,
+                                            size: 13,
+                                            color: Color(0xFF475569),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            provider.hasCustomStartDay(
+                                                    targetUserId: widget.targetUserId ?? myUid)
+                                                ? 'Ubah'
+                                                : 'Atur Tgl',
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF475569),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
                       // B. Pemasukan & Pengeluaran Summary Row
                       FinanceSummaryRow(
-                        income: provider.currentMonthIncome,
-                        expense: provider.currentMonthExpense,
+                        income: provider.getDynamicIncome(
+                            targetUserId: widget.targetUserId ?? myUid),
+                        expense: provider.getDynamicExpense(
+                            targetUserId: widget.targetUserId ?? myUid),
                         isBalanceVisible: provider.isBalanceVisible,
+                        onIncomeTap: () => _navigateToBreakdown('income'),
+                        onExpenseTap: () => _navigateToBreakdown('expense'),
                       ),
                       const SizedBox(height: 18),
 
                       // C. Kategori Pengeluaran & Budget Carousel
                       FinanceExpenseCarousel(
-                        breakdown: provider.categoryExpenseBreakdown,
-                        budgetProgressList:
-                            provider.getBudgetProgressList(currentUserId: myUid),
+                        breakdown: provider.getDynamicCategoryExpenseBreakdown(
+                            targetUserId: widget.targetUserId ?? myUid),
+                        budgetProgressList: provider.getBudgetProgressList(
+                            currentUserId: myUid),
                         targetUserId: widget.targetUserId,
                         partnerName: widget.partnerName,
                         isPartnerMode: isPartner,
+                        periodLabel: provider.getDynamicPeriodLabel(
+                            targetUserId: widget.targetUserId ?? myUid),
                       ),
                       const SizedBox(height: 22),
 

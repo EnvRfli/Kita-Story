@@ -29,6 +29,7 @@ import '../../features/vacations/models/vacation_activity_model.dart';
 import '../../features/finances/ui/finance_screen.dart';
 import '../../features/finances/ui/all_transactions_screen.dart';
 import '../../features/finances/ui/budget_list_screen.dart';
+import '../../features/finances/ui/finance_breakdown_screen.dart';
 import '../../features/credentials/ui/credentials_screen.dart';
 import '../../features/credentials/ui/add_credential_screen.dart';
 import '../../features/credentials/models/credential_model.dart';
@@ -306,6 +307,24 @@ final GoRouter appRouter = GoRouter(
           targetUserId: targetUserId,
           partnerName: partnerName,
           isPartnerMode: isPartnerMode,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/finance/breakdown',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final targetUserId = extra?['targetUserId'] as String?;
+        final partnerName = extra?['partnerName'] as String?;
+        final isPartnerMode = (extra?['isPartnerMode'] as bool?) ?? false;
+        final initialType = (state.uri.queryParameters['type'] ??
+                extra?['type'] as String?) ??
+            'expense';
+        return FinanceBreakdownScreen(
+          targetUserId: targetUserId,
+          partnerName: partnerName,
+          isPartnerMode: isPartnerMode,
+          initialType: initialType,
         );
       },
     ),
