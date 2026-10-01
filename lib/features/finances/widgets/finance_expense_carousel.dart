@@ -10,6 +10,7 @@ class FinanceExpenseCarousel extends StatefulWidget {
   final String? targetUserId;
   final String? partnerName;
   final bool isPartnerMode;
+  final String? periodLabel;
 
   const FinanceExpenseCarousel({
     super.key,
@@ -18,6 +19,7 @@ class FinanceExpenseCarousel extends StatefulWidget {
     this.targetUserId,
     this.partnerName,
     this.isPartnerMode = false,
+    this.periodLabel,
   });
 
   @override
@@ -76,6 +78,7 @@ class _FinanceExpenseCarouselState extends State<FinanceExpenseCarousel> {
                     child: FinanceCategoryDonutChart(
                       breakdown: widget.breakdown,
                       showContainer: false,
+                      periodLabel: widget.periodLabel,
                     ),
                   ),
 
