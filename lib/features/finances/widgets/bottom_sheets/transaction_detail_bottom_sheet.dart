@@ -246,93 +246,93 @@ class _TransactionDetailBottomSheetState
               if (!widget.isReadOnly)
                 Row(
                   children: [
-                  // Ubah Button
-                  Expanded(
-                    child: Container(
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0088FF), Color(0xFF0775D5)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                const Color(0xFF0088FF).withValues(alpha: 0.30),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                    // Ubah Button
+                    Expanded(
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0088FF), Color(0xFF0775D5)],
                           ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _handleEdit,
                           borderRadius: BorderRadius.circular(12),
-                          child: const Center(
-                            child: Text(
-                              'Ubah',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w700,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0088FF)
+                                  .withValues(alpha: 0.30),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _handleEdit,
+                            borderRadius: BorderRadius.circular(12),
+                            child: const Center(
+                              child: Text(
+                                'Ubah',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
+                    const SizedBox(width: 12),
 
-                  // Hapus Button
-                  Expanded(
-                    child: Container(
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFF3B30), Color(0xFFE02424)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                const Color(0xFFFF3B30).withValues(alpha: 0.30),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                    // Hapus Button
+                    Expanded(
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF3B30), Color(0xFFE02424)],
                           ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _isDeleting ? null : _handleDelete,
                           borderRadius: BorderRadius.circular(12),
-                          child: Center(
-                            child: _isDeleting
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF3B30)
+                                  .withValues(alpha: 0.30),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _isDeleting ? null : _handleDelete,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Center(
+                              child: _isDeleting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Hapus',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                  )
-                                : const Text(
-                                    'Hapus',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
         ),
