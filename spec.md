@@ -82,6 +82,22 @@
     * Kredensial Pribadi: **`+5 Poin`** (`add_credential`)
   * Ubah & Hapus tidak memberikan/mengurangi poin (0 poin).
 
+### J. Toilet / Couple Poop Tracker (`lib/features/toilet`, `lib/core/services/location_service.dart`)
+* **Kartu Status Toilet Kita (`CoupleLastPoopCard`):** Menampilkan perbandingan waktu & lokasi terakhir kali poop antara Kamu dan Pasangan secara *real-time*, dilengkapi *Playful Digestive Status Icon* (Lancar Jaya ✨, 1 Hari 🌱⏳, 2 Hari 🎈😣, 3 Hari 🪨🥵, >= 4 Hari 🚨😭) serta *Digestive Health Insight Banner* bulanan.
+* **Wajib GPS (Mode Live) vs Backdate & Lokasi Manual:**
+  * Mode Live mengunci koordinat GPS akurat (`latitude`, `longitude`) melalui `MethodChannel('com.example.kita_story/location')` di `MainActivity.kt` dan menerjemahkan alamat secara otomatis (*reverse geocoding*).
+  * Mode Backdate & Set Lokasi Manual memungkinkan pencatatan waktu lampau dan penulisan lokasi manual atau pencarian alamat OpenStreetMap Nominatim.
+* **Notifikasi Pengingat Pencernaan & Serat Berjenjang (Hard-Reset & Rewrite):**
+  * Menjadwalkan notifikasi pengingat makan serat & minum air putih pada Hari ke-1, ke-2, ke-3, dan >= ke-4 sejak waktu poop terakhir (atau sejak aplikasi diinstall).
+  * Setiap kali data poop baru ditambahkan/diubah, seluruh jadwal notifikasi lama di-*reset* total (`cancelPoopReminders`) dan dijadwalkan ulang dari awal.
+
+### K. Siklus Haid / Cycle Tracker (`lib/features/cycle`)
+* **Peran berbasis gender (`app_users.gender`):** `female` menjadi owner (atur siklus & catat log harian), `male` dengan pasangan female menjadi monitor read-only, gender lain/null menyembunyikan fitur.
+* **Siklus dihitung dari hari pertama haid terakhir (LMP), bukan hari terakhir.** Panjang siklus = jarak hari pertama haid ke hari pertama haid berikutnya; `period_length` hanya menentukan rentang haid.
+* **Tidak ada auto-roll saat telat:** jika tanggal perkiraan haid terlewati dan belum ada log haid baru, sistem menampilkan status `Terlambat N hari`, menghentikan prediksi haid di kalender, dan menampilkan CTA "Sudah mulai haid". Siklus baru dimulai hanya setelah female mencatat haid (aliran medium/heavy).
+* **Notifikasi insight harian 07:00:** 3 insight per fase untuk owner dan 3 untuk monitor (plus 3 insight khusus terlambat per peran). Teks berotasi tiap 3 hari dan body selalu memuat hari/fase/kountdown sehingga setiap hari berbeda. Jadwal di-*hard-reset* dan ditulis ulang 14 hari ke depan setiap data siklus dimuat/diubah (`cycle_insight`, ID `910001..910014`).
+* **Gamifikasi:** +3 poin untuk catatan baru per hari, bonus streak sekali per milestone (+5 untuk 3 hari, +10 untuk 7 hari, +20 untuk 14 hari) dengan dedupe lewat `user_point_logs`, serta kartu streak 7 hari di layar siklus.
+
 ---
 
 ## 3. Technical Stack & Architecture
@@ -118,6 +134,8 @@ lib/
 │   ├── profile/            # Pengaturan Akun, Fit & Crop Foto Profil
 │   ├── recipes/            # Resep Masakan & Panduan Memasak
 │   ├── reminders/          # Pengingat, Notifikasi Berjenjang, & Agenda
+│   ├── toilet/             # Poop Tracker Bersama, GPS & Manual Location, Digestive Status & Insight
+│   ├── cycle/              # Siklus Haid, Fase & Kalender, Insight 07:00, Streak & Bonus Poin
 │   └── vacations/          # Liburan, Kalender, & Itinerary Kegiatan
 ```
 
@@ -151,6 +169,12 @@ lib/
 | **Liburan** | Buat Jadwal Liburan | `add_vacation` | **`+10`** | `Menambah Liburan Baru ✈️` | `Menjadwalkan liburan "[Judul]" ([Tgl Mulai] - [Tgl Selesai])` |
 | **Liburan** | Tambah Agenda Kegiatan | `add_vacation_activity` | **`+3`** | `Menambah Agenda Liburan 🏖️` | `Menambahkan agenda "[Aktivitas]" pada liburan "[Judul Liburan]"` |
 | **Liburan** | Selesaikan Agenda | `complete_vacation_activity` | **`+2`** | `Agenda Selesai ✅` | `Menyelesaikan agenda "[Aktivitas]" pada liburan "[Judul Liburan]"` |
+| **Toilet** | Catat Poop Bersama | `add_shared_poop` | **`+5`** | `Mencatat Laporan Toilet 🚽💕` | `Mencatat aktivitas toilet di "[Lokasi]" ([Kondisi], [Perasaan])` |
+| **Toilet** | Catat Poop Pribadi | `add_poop` | **`+3`** | `Mencatat Laporan Toilet 🚽` | `Mencatat aktivitas toilet di "[Lokasi]" ([Kondisi], [Perasaan])` |
+| **Siklus** | Catat Siklus Harian | `cycle_log` | **`+3`** | `Mencatat Siklus 🌸` | `Mencatat kondisi siklus pada [Tanggal]` |
+| **Siklus** | Streak 3 Hari | `cycle_streak_3` | **`+5`** | `Streak 3 Hari 🔥` | `Mencatat siklus 3 hari berturut-turut` |
+| **Siklus** | Streak 7 Hari | `cycle_streak_7` | **`+10`** | `Streak 7 Hari 🔥` | `Mencatat siklus 7 hari berturut-turut` |
+| **Siklus** | Streak 14 Hari | `cycle_streak_14` | **`+20`** | `Streak 14 Hari 🔥` | `Mencatat siklus 14 hari berturut-turut` |
 | **Profil** | Ganti Foto Profil | `update_avatar` | **`+5`** | `Ganti Foto Profil 🖼️` | `Memperbarui foto profil akun` |
 
 ---
@@ -421,5 +445,52 @@ CREATE TABLE IF NOT EXISTS finance_budgets (
   alert_100_notified BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 10. Toilet / Poop Tracker Module
+CREATE TABLE IF NOT EXISTS public.poop_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.app_users(id) ON DELETE CASCADE,
+  partner_id UUID REFERENCES public.app_users(id) ON DELETE SET NULL,
+  is_shared BOOLEAN NOT NULL DEFAULT true,
+  pooped_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  is_backdated BOOLEAN NOT NULL DEFAULT false,
+  location_name TEXT NOT NULL,
+  location_address TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  is_manual_location BOOLEAN NOT NULL DEFAULT false,
+  stool_type TEXT NOT NULL DEFAULT 'normal',
+  feeling TEXT NOT NULL DEFAULT 'relieved',
+  duration_minutes INTEGER DEFAULT 5,
+  note TEXT,
+  added_by UUID NOT NULL REFERENCES public.app_users(id) ON DELETE CASCADE,
+  last_updated_by UUID REFERENCES public.app_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 11. Cycle / Menstrual Tracker Module
+CREATE TABLE IF NOT EXISTS public.cycle_settings (
+  user_id UUID PRIMARY KEY REFERENCES public.app_users(id) ON DELETE CASCADE,
+  cycle_length INT NOT NULL DEFAULT 28 CHECK (cycle_length BETWEEN 21 AND 45),
+  period_length INT NOT NULL DEFAULT 5 CHECK (period_length BETWEEN 2 AND 10),
+  last_period_start DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.cycle_day_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.app_users(id) ON DELETE CASCADE,
+  log_date DATE NOT NULL,
+  flow TEXT NOT NULL DEFAULT 'none'
+    CHECK (flow IN ('none', 'spotting', 'light', 'medium', 'heavy')),
+  mood TEXT,
+  symptoms TEXT[] NOT NULL DEFAULT '{}',
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, log_date)
 );
 ```

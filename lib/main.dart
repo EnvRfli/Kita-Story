@@ -15,6 +15,8 @@ import 'features/vacations/providers/vacation_provider.dart';
 import 'features/finances/providers/finance_provider.dart';
 import 'features/credentials/providers/credential_security_provider.dart';
 import 'features/credentials/providers/credential_provider.dart';
+import 'features/toilet/providers/toilet_provider.dart';
+import 'features/cycle/providers/cycle_provider.dart';
 import 'features/games/ludo/models/ludo_game_state.dart';
 import 'features/games/ludo/providers/ludo_game_provider.dart';
 import 'features/games/ludo/providers/ludo_invite_provider.dart';
@@ -77,6 +79,8 @@ class KitaStoryApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FinanceProvider()),
         ChangeNotifierProvider(create: (_) => CredentialSecurityProvider()),
         ChangeNotifierProvider(create: (_) => CredentialProvider()),
+        ChangeNotifierProvider(create: (_) => ToiletProvider()),
+        ChangeNotifierProvider(create: (_) => CycleProvider()),
         ChangeNotifierProvider(create: (_) => LudoGameProvider()),
         ChangeNotifierProvider(create: (_) => LudoInviteProvider()),
       ],
