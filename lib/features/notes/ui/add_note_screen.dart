@@ -32,6 +32,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   final List<TextEditingController> _checklistControllers = [];
   final List<bool> _checklistCheckedStates = [];
 
+  bool _hideCheckedItems = false;
   bool _isLoading = false;
 
   @override
@@ -546,12 +547,100 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   }
 
   Widget _buildChecklistContentFields() {
+    final totalCount = _checklistControllers.length;
+    final checkedCount = _checklistCheckedStates.where((c) => c).length;
+    final allHidden = _hideCheckedItems && checkedCount == totalCount && totalCount > 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (checkedCount > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Row(
+              children: [
+                Text(
+                  '$checkedCount/$totalCount selesai',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const Spacer(),
+                InkWell(
+                  onTap: () {
+                    setState(() => _hideCheckedItems = !_hideCheckedItems);
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _hideCheckedItems
+                          ? const Color(0xFFFFF7ED)
+                          : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _hideCheckedItems
+                            ? const Color(0xFFFED7AA)
+                            : const Color(0xFFE2E8F0),
+                        width: 1.1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _hideCheckedItems
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 14,
+                          color: _hideCheckedItems
+                              ? const Color(0xFFFF7A00)
+                              : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _hideCheckedItems
+                              ? 'Tampilkan selesai ($checkedCount)'
+                              : 'Sembunyikan selesai ($checkedCount)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _hideCheckedItems
+                                ? const Color(0xFFFF7A00)
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (allHidden)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              'Semua $checkedCount item selesai disembunyikan.',
+              style: const TextStyle(
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+          ),
         ...List.generate(_checklistControllers.length, (index) {
           final controller = _checklistControllers[index];
           final isChecked = _checklistCheckedStates[index];
+
+          if (_hideCheckedItems && isChecked) {
+            return const SizedBox.shrink();
+          }
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),

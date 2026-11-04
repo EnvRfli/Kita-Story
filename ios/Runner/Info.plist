@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Aplikasi DayTale memerlukan akses lokasi GPS untuk mencatat titik lokasi Toilet (Poop Tracker) secara akurat.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Aplikasi DayTale memerlukan akses lokasi GPS untuk mencatat titik lokasi Toilet (Poop Tracker) secara akurat.</string>
 </dict>
 </plist>

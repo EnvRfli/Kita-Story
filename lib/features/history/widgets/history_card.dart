@@ -225,6 +225,28 @@ class HistoryCard extends StatelessWidget {
       );
     }
 
+    // 3b. Toilet / Poop Tracker (Warm Amber / Orange)
+    if (typeLower.contains('poop') ||
+        typeLower.contains('toilet') ||
+        titleLower.contains('toilet')) {
+      return _ActivityVisuals(
+        icon: Icons.place_rounded,
+        iconColor: const Color(0xFFD97706),
+        backgroundColor: const Color(0xFFFEF3C7),
+      );
+    }
+
+    // 3c. Cycle / Menstrual Tracker (Rose)
+    if (typeLower.contains('cycle') ||
+        titleLower.contains('siklus') ||
+        titleLower.contains('haid')) {
+      return _ActivityVisuals(
+        icon: Icons.water_drop_rounded,
+        iconColor: const Color(0xFFE11D48),
+        backgroundColor: const Color(0xFFFFE4E6),
+      );
+    }
+
     // 4. Add / Create (Blue)
     if (typeLower.contains('add') ||
         typeLower.contains('create') ||

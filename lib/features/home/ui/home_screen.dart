@@ -18,6 +18,10 @@ import '../../reminders/widgets/widgets.dart';
 import '../widgets/cute_home_icon.dart';
 import '../widgets/wavy_menu_card.dart';
 import '../../credentials/widgets/pin_auth_bottom_sheet.dart';
+import '../../toilet/providers/toilet_provider.dart';
+import '../../cycle/providers/cycle_provider.dart';
+import '../../cycle/utils/cycle_role.dart';
+import '../../cycle/widgets/cycle_home_banner.dart';
 
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
@@ -94,6 +98,31 @@ class _HomeScreenState extends State<HomeScreen>
     await reminderProvider.fetchReminders(
       partnerId: authProvider.partnerProfile?.id,
     );
+    if (!mounted) return;
+    final toiletProvider = Provider.of<ToiletProvider>(context, listen: false);
+    await toiletProvider.fetchPoopLogs(
+      partnerId: authProvider.partnerProfile?.id,
+    );
+    if (!mounted) return;
+
+    final cycleRole = CycleAccess.resolve(
+      me: authProvider.currentUserProfile,
+      partner: authProvider.partnerProfile,
+    );
+    final cycleUserId = cycleRole == CycleRole.owner
+        ? authProvider.currentUserProfile?.id
+        : (cycleRole == CycleRole.monitor
+            ? authProvider.partnerProfile?.id
+            : null);
+    if (cycleUserId != null && mounted) {
+      await Provider.of<CycleProvider>(context, listen: false).fetchCycleData(
+        userId: cycleUserId,
+        role: cycleRole,
+        partnerName: authProvider.partnerProfile?.name,
+      );
+    }
+    if (!mounted) return;
+
     if (showPopupIfNeeded && mounted) {
       final shouldShow = await reminderProvider.shouldShowDailyPopup();
       if (shouldShow &&
@@ -429,6 +458,19 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
 
+    final cycleAuth = context.watch<AuthProvider>();
+    final cycleRole = CycleAccess.resolve(
+      me: cycleAuth.currentUserProfile,
+      partner: cycleAuth.partnerProfile,
+    );
+    final cycleUserId = cycleRole == CycleRole.owner
+        ? cycleAuth.currentUserProfile?.id
+        : (cycleRole == CycleRole.monitor
+            ? cycleAuth.partnerProfile?.id
+            : null);
+    final cycleSummary =
+        context.watch<CycleProvider>().dataFor(cycleUserId)?.summary;
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -538,6 +580,16 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                   const SizedBox(height: 28),
+
+                  if (cycleRole != CycleRole.hidden) ...[
+                    CycleHomeBanner(
+                      role: cycleRole,
+                      partnerName: cycleAuth.partnerProfile?.name,
+                      summary: cycleSummary,
+                      onTap: () => _navigateTo('/cycle'),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Menu Section Title & Grid (with Entrance Animation)
                   FadeTransition(
@@ -1486,6 +1538,19 @@ class _HomeScreenState extends State<HomeScreen>
           children: [
             Expanded(
               child: WavyMenuCard(
+                title: 'Toilet',
+                imagePath: 'lib/assets/homescreen assets/toilet.png',
+                imageRight: -12,
+                imageTop: null,
+                imageBottom: -10,
+                imageWidth: 96,
+                waveColor: const Color(0xFFF59E0B),
+                onTap: () => _navigateTo('/toilet'),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: WavyMenuCard(
                 title: 'Riwayat',
                 imagePath:
                     'lib/assets/homescreen assets/386ff72a-ca85-47aa-9eeb-f38d9ab4c154 2.png',
@@ -1497,8 +1562,6 @@ class _HomeScreenState extends State<HomeScreen>
                 onTap: () => _navigateTo('/history'),
               ),
             ),
-            const SizedBox(width: 14),
-            const Expanded(child: SizedBox()),
           ],
         ),
       ],

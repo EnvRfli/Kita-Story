@@ -6,6 +6,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/badge_bubble_tooltip.dart';
 import '../../../../core/widgets/gradient_avatar.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../cycle/providers/cycle_provider.dart';
+import '../../cycle/utils/cycle_role.dart';
+import '../../cycle/widgets/cycle_home_banner.dart';
 
 class PartnerHomeScreen extends StatefulWidget {
   const PartnerHomeScreen({super.key});
@@ -17,6 +20,24 @@ class PartnerHomeScreen extends StatefulWidget {
 class _PartnerHomeScreenState extends State<PartnerHomeScreen> {
   final GlobalKey _pointKey = GlobalKey();
   final GlobalKey _shieldKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final partner = context.read<AuthProvider>().partnerProfile;
+      if (partner?.id != null &&
+          CycleAccess.resolveForPartner(partner: partner) ==
+              CycleRole.monitor) {
+        context.read<CycleProvider>().fetchCycleData(
+              userId: partner!.id,
+              role: CycleRole.monitor,
+              partnerName: partner.name,
+            );
+      }
+    });
+  }
 
   void _showPointTooltip(
     BuildContext context,
@@ -400,6 +421,26 @@ class _PartnerHomeScreenState extends State<PartnerHomeScreen> {
                   ),
                   const SizedBox(height: 36),
 
+                  if (CycleAccess.resolveForPartner(partner: partnerUser) !=
+                      CycleRole.hidden) ...[
+                    CycleHomeBanner(
+                      role: CycleRole.monitor,
+                      partnerName: partnerName,
+                      summary: context
+                          .watch<CycleProvider>()
+                          .dataFor(partnerUser?.id)
+                          ?.summary,
+                      onTap: () => context.push(
+                        '/partner-cycle',
+                        extra: {
+                          'partnerId': partnerUser?.id,
+                          'partnerName': partnerName,
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                  ],
+
                   // Section Title: "Jelajahi ✨"
                   const Text(
                     'Jelajahi ✨',
@@ -588,9 +629,29 @@ class _PartnerHomeScreenState extends State<PartnerHomeScreen> {
         ),
         const SizedBox(height: 14),
 
-        // Row 4: Riwayat
+        // Row 4: Toilet & Riwayat
         Row(
           children: [
+            Expanded(
+              child: _buildMenuCard(
+                title: 'Toilet',
+                imagePath: 'lib/assets/homescreen assets/toilet.png',
+                imageRight: -12,
+                imageTop: null,
+                imageBottom: -10,
+                imageWidth: 94,
+                onTap: () {
+                  context.push(
+                    '/partner-toilet',
+                    extra: {
+                      'partnerId': partnerId,
+                      'partnerName': partnerName,
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: _buildMenuCard(
                 title: 'Riwayat',
@@ -603,8 +664,6 @@ class _PartnerHomeScreenState extends State<PartnerHomeScreen> {
                 onTap: () => context.push('/history'),
               ),
             ),
-            const SizedBox(width: 14),
-            const Expanded(child: SizedBox()),
           ],
         ),
       ],

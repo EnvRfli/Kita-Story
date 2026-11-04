@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/utils/app_snackbar.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -25,14 +26,34 @@ class NoteDetailScreen extends StatefulWidget {
 }
 
 class _NoteDetailScreenState extends State<NoteDetailScreen> {
+  static const String _hideCheckedPrefKey = 'notes_hide_checked_items';
+
   late NoteModel _currentNote;
   bool _isTogglingComplete = false;
+  bool _hideCheckedItems = false;
 
   @override
   void initState() {
     super.initState();
     _currentNote = widget.note;
+    _loadHideCheckedPreference();
     _refreshNoteDetails();
+  }
+
+  Future<void> _loadHideCheckedPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getBool(_hideCheckedPrefKey) ?? false;
+    if (mounted) {
+      setState(() => _hideCheckedItems = saved);
+    }
+  }
+
+  Future<void> _toggleHideCheckedItems() async {
+    HapticFeedback.selectionClick();
+    final nextValue = !_hideCheckedItems;
+    setState(() => _hideCheckedItems = nextValue);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_hideCheckedPrefKey, nextValue);
   }
 
   Future<void> _refreshNoteDetails() async {
@@ -657,86 +678,202 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       );
     }
 
+    final totalCount = items.length;
+    final checkedCount = items.where((i) => i.isChecked).length;
+    final visibleItems = _hideCheckedItems
+        ? items.where((i) => !i.isChecked).toList()
+        : items;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: items.map((item) {
-        return Padding(
+      children: [
+        Padding(
           padding: const EdgeInsets.only(bottom: 14),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Live Interactive Checkbox
-              InkWell(
-                onTap: (!widget.isReadOnly || _currentNote.isShared)
-                    ? () async {
-                        final willBeChecked = !item.isChecked;
-                        setState(() {
-                          final updatedItems = _currentNote.items.map((i) {
-                            if (i.id == item.id) {
-                              return i.copyWith(isChecked: willBeChecked);
-                            }
-                            return i;
-                          }).toList();
-                          _currentNote =
-                              _currentNote.copyWith(items: updatedItems);
-                        });
-
-                        await Provider.of<NoteProvider>(context, listen: false)
-                            .toggleChecklistItem(
-                          _currentNote.id,
-                          item.id,
-                          willBeChecked,
-                        );
-                      }
-                    : null,
-                borderRadius: BorderRadius.circular(6),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    color:
-                        item.isChecked ? const Color(0xFF22C55E) : Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: item.isChecked
-                          ? const Color(0xFF22C55E)
-                          : const Color(0xFFCBD5E1),
-                      width: 1.6,
+              Text(
+                '$checkedCount/$totalCount selesai',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              const Spacer(),
+              if (checkedCount > 0)
+                InkWell(
+                  onTap: _toggleHideCheckedItems,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _hideCheckedItems
+                          ? const Color(0xFFFFF7ED)
+                          : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _hideCheckedItems
+                            ? const Color(0xFFFED7AA)
+                            : const Color(0xFFE2E8F0),
+                        width: 1.1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _hideCheckedItems
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 14,
+                          color: _hideCheckedItems
+                              ? const Color(0xFFFF7A00)
+                              : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _hideCheckedItems
+                              ? 'Tampilkan selesai ($checkedCount)'
+                              : 'Sembunyikan selesai ($checkedCount)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _hideCheckedItems
+                                ? const Color(0xFFFF7A00)
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: item.isChecked
-                      ? const Icon(
-                          Icons.check_rounded,
-                          size: 16,
-                          color: Colors.white,
-                        )
-                      : null,
                 ),
-              ),
-              const SizedBox(width: 12),
-
-              // Item text (strikethrough when checked)
-              Expanded(
-                child: Text(
-                  item.itemText,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: item.isChecked
-                        ? const Color(0xFF94A3B8)
-                        : const Color(0xFF1E293B),
-                    decoration:
-                        item.isChecked ? TextDecoration.lineThrough : null,
-                    decorationColor: const Color(0xFF94A3B8),
-                    decorationThickness: 2.0,
-                  ),
-                ),
-              ),
             ],
           ),
-        );
-      }).toList(),
+        ),
+        if (visibleItems.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+                width: 1.1,
+              ),
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  'Semua item checklist sudah selesai! 🎉',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                GestureDetector(
+                  onTap: _toggleHideCheckedItems,
+                  child: Text(
+                    'Tampilkan $checkedCount item selesai',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFFF7A00),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ...visibleItems.map((item) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Live Interactive Checkbox
+                  InkWell(
+                    onTap: (!widget.isReadOnly || _currentNote.isShared)
+                        ? () async {
+                            final willBeChecked = !item.isChecked;
+                            setState(() {
+                              final updatedItems = _currentNote.items.map((i) {
+                                if (i.id == item.id) {
+                                  return i.copyWith(isChecked: willBeChecked);
+                                }
+                                return i;
+                              }).toList();
+                              _currentNote =
+                                  _currentNote.copyWith(items: updatedItems);
+                            });
+
+                            await Provider.of<NoteProvider>(
+                              context,
+                              listen: false,
+                            ).toggleChecklistItem(
+                              _currentNote.id,
+                              item.id,
+                              willBeChecked,
+                            );
+                          }
+                        : null,
+                    borderRadius: BorderRadius.circular(6),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: item.isChecked
+                            ? const Color(0xFF22C55E)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: item.isChecked
+                              ? const Color(0xFF22C55E)
+                              : const Color(0xFFCBD5E1),
+                          width: 1.6,
+                        ),
+                      ),
+                      child: item.isChecked
+                          ? const Icon(
+                              Icons.check_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Item text (strikethrough when checked)
+                  Expanded(
+                    child: Text(
+                      item.itemText,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: item.isChecked
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF1E293B),
+                        decoration:
+                            item.isChecked ? TextDecoration.lineThrough : null,
+                        decorationColor: const Color(0xFF94A3B8),
+                        decorationThickness: 2.0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+      ],
     );
   }
 

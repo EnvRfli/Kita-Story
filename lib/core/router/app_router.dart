@@ -33,6 +33,8 @@ import '../../features/finances/ui/finance_breakdown_screen.dart';
 import '../../features/credentials/ui/credentials_screen.dart';
 import '../../features/credentials/ui/add_credential_screen.dart';
 import '../../features/credentials/models/credential_model.dart';
+import '../../features/toilet/ui/toilet_screen.dart';
+import '../../features/cycle/ui/cycle_screen.dart';
 import '../../features/games/ui/games_screen.dart';
 import '../../features/games/ludo/ui/ludo_start_screen.dart';
 
@@ -347,6 +349,38 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/ludo',
       builder: (context, state) => const LudoStartScreen(),
+    ),
+    // --- TOILET / POOP TRACKER MODULE ---
+    GoRoute(
+      path: '/toilet',
+      builder: (context, state) => const ToiletScreen(),
+    ),
+    GoRoute(
+      path: '/partner-toilet',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return ToiletScreen(
+          partnerId: extra?['partnerId'] as String?,
+          partnerName: extra?['partnerName'] as String?,
+          isReadOnly: true,
+        );
+      },
+    ),
+    // --- CYCLE / MENSTRUAL TRACKER MODULE ---
+    GoRoute(
+      path: '/cycle',
+      builder: (context, state) => const CycleScreen(),
+    ),
+    GoRoute(
+      path: '/partner-cycle',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return CycleScreen(
+          partnerId: extra?['partnerId'] as String?,
+          partnerName: extra?['partnerName'] as String?,
+          isReadOnly: true,
+        );
+      },
     ),
   ],
 );
