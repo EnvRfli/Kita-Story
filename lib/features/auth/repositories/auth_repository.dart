@@ -4,7 +4,7 @@ import '../../../core/network/supabase_client.dart';
 import '../../../core/services/activity_log_service.dart';
 
 class AuthRepository {
-  final _client = SupabaseNetwork.client;
+  SupabaseClient get _client => SupabaseNetwork.client;
 
   Future<AuthResponse> signInWithEmailPassword(
       String email, String password) async {

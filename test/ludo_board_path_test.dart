@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kita_story/features/games/ludo/engine/ludo_board_path.dart';
 import 'package:kita_story/features/games/ludo/models/ludo_player.dart';
+import 'package:kita_story/features/games/ludo/models/ludo_token.dart';
 
 void main() {
   group('LudoBoardPath', () {
@@ -78,6 +79,50 @@ void main() {
       // Green (start 13): step 0 -> 13, step 40 -> (13+40)%52 = 1
       expect(LudoBoardPath.relativeStepToGlobalIndex(LudoColor.green, 0), 13);
       expect(LudoBoardPath.relativeStepToGlobalIndex(LudoColor.green, 40), 1);
+    });
+
+    test('buildMovePath returns one coordinate per dice step', () {
+      final path = LudoBoardPath.buildMovePath(
+        color: LudoColor.green,
+        tokenId: 0,
+        fromState: LudoTokenState.track,
+        fromStep: 10,
+        diceRoll: 4,
+      );
+
+      expect(path.length, 5);
+      expect(path.first,
+          LudoBoardPath.globalTrack[LudoBoardPath.relativeStepToGlobalIndex(
+              LudoColor.green, 10)]);
+      expect(path.last,
+          LudoBoardPath.globalTrack[LudoBoardPath.relativeStepToGlobalIndex(
+              LudoColor.green, 14)]);
+    });
+
+    test('buildMovePath handles yard exit and home stretch', () {
+      final yardPath = LudoBoardPath.buildMovePath(
+        color: LudoColor.green,
+        tokenId: 2,
+        fromState: LudoTokenState.yard,
+        fromStep: 0,
+        diceRoll: 6,
+      );
+
+      expect(yardPath.length, 2);
+      expect(yardPath.first, LudoBoardPath.yardSlots[LudoColor.green]![2]);
+      expect(yardPath.last, LudoBoardPath.globalTrack[13]);
+
+      final stretchPath = LudoBoardPath.buildMovePath(
+        color: LudoColor.green,
+        tokenId: 0,
+        fromState: LudoTokenState.track,
+        fromStep: 50,
+        diceRoll: 3,
+      );
+
+      expect(stretchPath.length, 4);
+      expect(stretchPath[1], LudoBoardPath.homeStretches[LudoColor.green]![0]);
+      expect(stretchPath.last, LudoBoardPath.homeStretches[LudoColor.green]![2]);
     });
   });
 }

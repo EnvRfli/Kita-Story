@@ -7,6 +7,8 @@ enum LudoMatchStatus {
   rejected,
   inProgress,
   completed,
+  cancelled,
+  expired,
   abandoned;
 
   static LudoMatchStatus fromString(String value) {
@@ -21,6 +23,10 @@ enum LudoMatchStatus {
         return LudoMatchStatus.inProgress;
       case 'completed':
         return LudoMatchStatus.completed;
+      case 'cancelled':
+        return LudoMatchStatus.cancelled;
+      case 'expired':
+        return LudoMatchStatus.expired;
       case 'abandoned':
         return LudoMatchStatus.abandoned;
       default:
@@ -40,6 +46,10 @@ enum LudoMatchStatus {
         return 'in_progress';
       case LudoMatchStatus.completed:
         return 'completed';
+      case LudoMatchStatus.cancelled:
+        return 'cancelled';
+      case LudoMatchStatus.expired:
+        return 'expired';
       case LudoMatchStatus.abandoned:
         return 'abandoned';
     }
@@ -57,6 +67,12 @@ class LudoMatchModel {
   final LudoMatchStatus status;
   final String? winnerId;
   final Map<String, dynamic> gameState;
+  final int gameVersion;
+  final Map<String, dynamic>? lastAction;
+  final DateTime? expiresAt;
+  final DateTime? acceptedAt;
+  final DateTime? finishedAt;
+  final String? abandonReason;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -70,9 +86,18 @@ class LudoMatchModel {
     this.status = LudoMatchStatus.invited,
     this.winnerId,
     this.gameState = const {},
+    this.gameVersion = 0,
+    this.lastAction,
+    this.expiresAt,
+    this.acceptedAt,
+    this.finishedAt,
+    this.abandonReason,
     required this.createdAt,
     required this.updatedAt,
   });
+
+  bool get isExpired =>
+      expiresAt != null && DateTime.now().isAfter(expiresAt!);
 
   bool isParticipant(String userId) => hostId == userId || guestId == userId;
   bool isHost(String userId) => hostId == userId;
@@ -101,6 +126,20 @@ class LudoMatchModel {
       status: LudoMatchStatus.fromString(json['status'] as String? ?? 'invited'),
       winnerId: json['winner_id'] as String?,
       gameState: (json['game_state'] as Map<String, dynamic>?) ?? const {},
+      gameVersion: (json['game_version'] as num?)?.toInt() ?? 0,
+      lastAction: json['last_action'] != null
+          ? Map<String, dynamic>.from(json['last_action'] as Map)
+          : null,
+      expiresAt: json['expires_at'] != null
+          ? DateTime.tryParse(json['expires_at'] as String)
+          : null,
+      acceptedAt: json['accepted_at'] != null
+          ? DateTime.tryParse(json['accepted_at'] as String)
+          : null,
+      finishedAt: json['finished_at'] != null
+          ? DateTime.tryParse(json['finished_at'] as String)
+          : null,
+      abandonReason: json['abandon_reason'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
@@ -120,6 +159,12 @@ class LudoMatchModel {
         'status': status.toDbValue(),
         'winner_id': winnerId,
         'game_state': gameState,
+        'game_version': gameVersion,
+        'last_action': lastAction,
+        'expires_at': expiresAt?.toIso8601String(),
+        'accepted_at': acceptedAt?.toIso8601String(),
+        'finished_at': finishedAt?.toIso8601String(),
+        'abandon_reason': abandonReason,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };

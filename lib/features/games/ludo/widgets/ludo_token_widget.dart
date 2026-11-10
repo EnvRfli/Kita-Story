@@ -6,6 +6,7 @@ class LudoTokenWidget extends StatefulWidget {
   final bool isMovable;
   final int count;
   final double size;
+  final bool counterRotate;
   final VoidCallback? onTap;
 
   const LudoTokenWidget({
@@ -14,6 +15,7 @@ class LudoTokenWidget extends StatefulWidget {
     this.isMovable = false,
     this.count = 1,
     this.size = 22,
+    this.counterRotate = false,
     this.onTap,
   });
 
@@ -109,12 +111,15 @@ class _LudoTokenWidgetState extends State<LudoTokenWidget>
               ),
               child: widget.count > 1
                   ? Center(
-                      child: Text(
-                        '${widget.count}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
+                      child: RotatedBox(
+                        quarterTurns: widget.counterRotate ? 2 : 0,
+                        child: Text(
+                          '${widget.count}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     )

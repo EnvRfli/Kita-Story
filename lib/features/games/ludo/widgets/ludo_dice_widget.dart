@@ -1,4 +1,5 @@
-import 'dart:math';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 class LudoDiceWidget extends StatefulWidget {
@@ -7,6 +8,7 @@ class LudoDiceWidget extends StatefulWidget {
   final bool isEnabled;
   final VoidCallback? onTap;
   final double size;
+  final Color accentColor;
 
   const LudoDiceWidget({
     super.key,
@@ -15,6 +17,7 @@ class LudoDiceWidget extends StatefulWidget {
     this.isEnabled = true,
     this.onTap,
     this.size = 54,
+    this.accentColor = const Color(0xFF0088FF),
   });
 
   @override
@@ -30,8 +33,11 @@ class _LudoDiceWidgetState extends State<LudoDiceWidget>
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 620),
     );
+    if (widget.isRolling) {
+      _animController.forward(from: 0);
+    }
   }
 
   @override
@@ -56,28 +62,41 @@ class _LudoDiceWidgetState extends State<LudoDiceWidget>
     return AnimatedBuilder(
       animation: _animController,
       builder: (context, child) {
-        final shake = widget.isRolling
-            ? sin(_animController.value * pi * 8) * 0.15
-            : 0.0;
+        final t = _animController.value;
+        final shake = widget.isRolling ? math.sin(t * math.pi * 10) * 0.18 : 0.0;
         final scale = widget.isRolling
-            ? 1.0 + sin(_animController.value * pi) * 0.12
+            ? 1.0 + math.sin(t * math.pi) * 0.16
             : 1.0;
+        final flip = widget.isRolling ? math.sin(t * math.pi * 6) * 0.25 : 0.0;
 
         return Transform.scale(
           scale: scale,
           child: Transform.rotate(
             angle: shake,
-            child: child,
+            child: Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.002)
+                ..rotateY(flip),
+              child: child,
+            ),
           ),
         );
       },
       child: GestureDetector(
         onTap: widget.isEnabled ? widget.onTap : null,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: Colors.white,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: widget.isEnabled
+                  ? [Colors.white, widget.accentColor.lighten(0.86)]
+                  : [Colors.white, const Color(0xFFF1F5F9)],
+            ),
             borderRadius: BorderRadius.circular(size * 0.26),
             boxShadow: [
               BoxShadow(
@@ -87,19 +106,26 @@ class _LudoDiceWidgetState extends State<LudoDiceWidget>
               ),
               if (widget.isEnabled && !widget.isRolling)
                 BoxShadow(
-                  color: const Color(0xFF0088FF).withValues(alpha: 0.4),
-                  blurRadius: 12,
+                  color: widget.accentColor.withValues(alpha: 0.42),
+                  blurRadius: 14,
                   spreadRadius: 2,
                 ),
             ],
             border: Border.all(
-              color: const Color(0xFFE2E8F0),
-              width: 1.2,
+              color: widget.isEnabled
+                  ? widget.accentColor.withValues(alpha: 0.38)
+                  : const Color(0xFFE2E8F0),
+              width: 1.3,
             ),
           ),
           child: CustomPaint(
             size: Size(size, size),
-            painter: _DicePipPainter(value: val),
+            painter: _DicePipPainter(
+              value: val,
+              color: widget.isEnabled
+                  ? const Color(0xFF1E293B)
+                  : const Color(0xFF94A3B8),
+            ),
           ),
         ),
       ),
@@ -107,15 +133,25 @@ class _LudoDiceWidgetState extends State<LudoDiceWidget>
   }
 }
 
+extension _ColorBrighten on Color {
+  Color lighten(double amount) {
+    final hsl = HSLColor.fromColor(this);
+    return hsl
+        .withLightness((hsl.lightness + amount).clamp(0.0, 1.0))
+        .toColor();
+  }
+}
+
 class _DicePipPainter extends CustomPainter {
   final int value;
+  final Color color;
 
-  _DicePipPainter({required this.value});
+  _DicePipPainter({required this.value, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
     final pipPaint = Paint()
-      ..color = const Color(0xFF1E293B)
+      ..color = color
       ..style = PaintingStyle.fill;
 
     final pipRadius = size.width * 0.085;
@@ -167,5 +203,5 @@ class _DicePipPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DicePipPainter oldDelegate) =>
-      oldDelegate.value != value;
+      oldDelegate.value != value || oldDelegate.color != color;
 }

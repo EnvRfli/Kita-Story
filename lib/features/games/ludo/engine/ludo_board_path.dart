@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/ludo_player.dart';
+import '../models/ludo_token.dart';
 
 @immutable
 class LudoCoordinate {
@@ -194,6 +195,67 @@ class LudoBoardPath {
   static int relativeStepToGlobalIndex(LudoColor color, int relativeStep) {
     final start = startIndexFor(color);
     return (start + relativeStep) % trackLength;
+  }
+
+  /// Returns every cell the token visits for a move, used by the step-by-step
+  /// movement animation. The first item is always the token's current cell.
+  static List<LudoCoordinate> buildMovePath({
+    required LudoColor color,
+    required int tokenId,
+    required LudoTokenState fromState,
+    required int fromStep,
+    required int diceRoll,
+  }) {
+    final path = <LudoCoordinate>[];
+    final yardCoord = yardSlots[color]![tokenId % yardSlots[color]!.length];
+
+    switch (fromState) {
+      case LudoTokenState.yard:
+        path.add(yardCoord);
+        path.add(globalTrack[startIndexFor(color)]);
+        return path;
+
+      case LudoTokenState.track:
+        path.add(coordinateForToken(
+          color: color,
+          tokenId: tokenId,
+          isInYard: false,
+          isOnTrack: true,
+          isInHomeStretch: false,
+          isHome: false,
+          step: fromStep,
+        ));
+        for (var i = 1; i <= diceRoll; i++) {
+          final newStep = fromStep + i;
+          if (newStep <= 50) {
+            path.add(globalTrack[relativeStepToGlobalIndex(color, newStep)]);
+          } else {
+            final remaining = newStep - 51;
+            if (remaining >= 5) {
+              path.add(homeCenterTargets[color]!);
+            } else {
+              path.add(homeStretches[color]![remaining]);
+            }
+          }
+        }
+        return path;
+
+      case LudoTokenState.homeStretch:
+        path.add(homeStretches[color]![fromStep.clamp(0, 4)]);
+        for (var i = 1; i <= diceRoll; i++) {
+          final newStep = fromStep + i;
+          if (newStep >= 5) {
+            path.add(homeCenterTargets[color]!);
+          } else {
+            path.add(homeStretches[color]![newStep]);
+          }
+        }
+        return path;
+
+      case LudoTokenState.home:
+        path.add(homeCenterTargets[color]!);
+        return path;
+    }
   }
 
   // Get physical coordinate on the 15x15 board for any token state

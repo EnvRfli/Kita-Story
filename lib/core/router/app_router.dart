@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/ui/splash_screen.dart';
 import '../../features/auth/ui/login_screen.dart';
@@ -37,8 +38,12 @@ import '../../features/toilet/ui/toilet_screen.dart';
 import '../../features/cycle/ui/cycle_screen.dart';
 import '../../features/games/ui/games_screen.dart';
 import '../../features/games/ludo/ui/ludo_start_screen.dart';
+import '../../features/games/ludo/ui/ludo_game_screen.dart';
+
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final GoRouter appRouter = GoRouter(
+  navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   routes: [
     GoRoute(
@@ -349,6 +354,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/ludo',
       builder: (context, state) => const LudoStartScreen(),
+    ),
+    GoRoute(
+      path: '/ludo/game',
+      builder: (context, state) => const LudoGameScreen(),
     ),
     // --- TOILET / POOP TRACKER MODULE ---
     GoRoute(

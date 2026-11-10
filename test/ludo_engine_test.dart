@@ -43,6 +43,7 @@ void main() {
       // Turn automatically passed to player 2!
       expect(nextState.currentTurnIndex, 1);
       expect(nextState.movableTokenIds, isEmpty);
+      expect(nextState.lastRolledByIndex, 0);
     });
 
     test('rolling 6 when tokens are in yard enables all yard tokens to move out', () {

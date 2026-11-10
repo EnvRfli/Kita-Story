@@ -44,7 +44,7 @@ class LudoToken {
 
   factory LudoToken.fromJson(Map<String, dynamic> json) {
     return LudoToken(
-      id: json['id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
       state: LudoTokenState.values.firstWhere(
         (e) => e.name == json['state'],
         orElse: () => LudoTokenState.yard,

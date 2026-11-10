@@ -3,34 +3,18 @@ import 'ludo_player.dart';
 
 enum LudoGameMode {
   offline2,
-  offline3,
-  offline4,
   onlineCouple;
 
   String get displayName {
     switch (this) {
       case LudoGameMode.offline2:
-        return 'Offline (2 Pemain)';
-      case LudoGameMode.offline3:
-        return 'Offline (3 Pemain)';
-      case LudoGameMode.offline4:
-        return 'Offline (4 Pemain)';
+        return 'Main Berdua di HP Ini';
       case LudoGameMode.onlineCouple:
         return 'Online Bersama Pasangan';
     }
   }
 
-  int get playerCount {
-    switch (this) {
-      case LudoGameMode.offline2:
-      case LudoGameMode.onlineCouple:
-        return 2;
-      case LudoGameMode.offline3:
-        return 3;
-      case LudoGameMode.offline4:
-        return 4;
-    }
-  }
+  int get playerCount => 2;
 }
 
 enum LudoTurnPhase {
@@ -48,6 +32,7 @@ class LudoGameState {
   final int currentTurnIndex;
   final LudoTurnPhase phase;
   final int? diceValue;
+  final int? lastRolledByIndex;
   final bool isRolling;
   final List<int> movableTokenIds;
   final LudoColor? winnerColor;
@@ -60,6 +45,7 @@ class LudoGameState {
     this.currentTurnIndex = 0,
     this.phase = LudoTurnPhase.waitingForRoll,
     this.diceValue,
+    this.lastRolledByIndex,
     this.isRolling = false,
     this.movableTokenIds = const [],
     this.winnerColor,
@@ -87,6 +73,7 @@ class LudoGameState {
     int? currentTurnIndex,
     LudoTurnPhase? phase,
     int? diceValue,
+    int? lastRolledByIndex,
     bool? isRolling,
     List<int>? movableTokenIds,
     LudoColor? winnerColor,
@@ -100,6 +87,7 @@ class LudoGameState {
       currentTurnIndex: currentTurnIndex ?? this.currentTurnIndex,
       phase: phase ?? this.phase,
       diceValue: clearDice ? null : (diceValue ?? this.diceValue),
+      lastRolledByIndex: lastRolledByIndex ?? this.lastRolledByIndex,
       isRolling: isRolling ?? this.isRolling,
       movableTokenIds: movableTokenIds ?? this.movableTokenIds,
       winnerColor: winnerColor ?? this.winnerColor,
@@ -114,6 +102,7 @@ class LudoGameState {
         'current_turn_index': currentTurnIndex,
         'phase': phase.name,
         'dice_value': diceValue,
+        'last_rolled_by_index': lastRolledByIndex,
         'movable_token_ids': movableTokenIds,
         'winner_color': winnerColor?.name,
         'bonus_roll_earned': bonusRollEarned,
@@ -147,6 +136,7 @@ class LudoGameState {
       currentTurnIndex: (json['current_turn_index'] as num?)?.toInt() ?? 0,
       phase: phase,
       diceValue: (json['dice_value'] as num?)?.toInt(),
+      lastRolledByIndex: (json['last_rolled_by_index'] as num?)?.toInt(),
       isRolling: false,
       movableTokenIds: (json['movable_token_ids'] as List<dynamic>?)
               ?.map((e) => (e as num).toInt())

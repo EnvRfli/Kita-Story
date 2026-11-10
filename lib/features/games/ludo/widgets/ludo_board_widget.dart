@@ -1,6 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
 import '../engine/ludo_board_path.dart';
 import '../models/ludo_game_state.dart';
+import '../models/ludo_motion.dart';
 import '../models/ludo_player.dart';
 import '../models/ludo_token.dart';
 import 'ludo_token_widget.dart';
@@ -8,16 +12,24 @@ import 'ludo_token_widget.dart';
 class LudoBoardWidget extends StatelessWidget {
   final LudoGameState state;
   final ValueChanged<int>? onTokenSelected;
+  final LudoMotion? motion;
+  final ValueChanged<String>? onMotionCompleted;
+  final VoidCallback? onStep;
+  final int rotationQuarterTurns;
 
   const LudoBoardWidget({
     super.key,
     required this.state,
     this.onTokenSelected,
+    this.motion,
+    this.onMotionCompleted,
+    this.onStep,
+    this.rotationQuarterTurns = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
+    final board = AspectRatio(
       aspectRatio: 1.0,
       child: Container(
         decoration: BoxDecoration(
@@ -42,30 +54,45 @@ class LudoBoardWidget extends StatelessWidget {
 
             return Stack(
               children: [
-                // 1. Board Background and Cells Grid
                 CustomPaint(
                   size: Size(constraints.maxWidth, constraints.maxHeight),
-                  painter: _LudoBoardPainter(),
+                  painter: _LudoBoardPainter(
+                    rotationQuarterTurns: rotationQuarterTurns,
+                  ),
                 ),
-
-                // 2. Active Tokens overlay
                 ..._buildTokenWidgets(cellSize),
+                if (motion != null)
+                  _LudoMotionLayer(
+                    key: ValueKey(motion!.id),
+                    motion: motion!,
+                    cellSize: cellSize,
+                    onCompleted: () => onMotionCompleted?.call(motion!.id),
+                    onStep: onStep,
+                  ),
               ],
             );
           },
         ),
       ),
     );
+
+    final turns = rotationQuarterTurns % 4;
+    if (turns == 0) return board;
+    return RotatedBox(quarterTurns: turns, child: board);
   }
 
   List<Widget> _buildTokenWidgets(double cellSize) {
     final widgets = <Widget>[];
+    final hidden = motion?.hiddenTokenKeys ?? const <String>{};
 
-    // Group tokens by their board coordinate so stacks are rendered nicely
-    final groupedTokens = <LudoCoordinate, List<({LudoPlayer player, LudoToken token})>>{};
+    final groupedTokens =
+        <LudoCoordinate, List<({LudoPlayer player, LudoToken token})>>{};
 
     for (final player in state.players) {
       for (final token in player.tokens) {
+        final key = '${player.color.name}:${token.id}';
+        if (hidden.contains(key)) continue;
+
         final coord = LudoBoardPath.coordinateForToken(
           color: player.color,
           tokenId: token.id,
@@ -76,50 +103,283 @@ class LudoBoardWidget extends StatelessWidget {
           step: token.step,
         );
 
-        groupedTokens.putIfAbsent(coord, () => []).add((player: player, token: token));
+        groupedTokens
+            .putIfAbsent(coord, () => [])
+            .add((player: player, token: token));
       }
     }
 
-    // Render grouped tokens
     groupedTokens.forEach((coord, items) {
-      // Check if any token in this cell is movable by current player
-      final movableItem = items.firstWhere(
-        (it) =>
-            it.player.color == state.currentPlayer.color &&
-            state.movableTokenIds.contains(it.token.id),
-        orElse: () => items.first,
-      );
+      // Different colors sharing a cell are split into their own mini token.
+      final byColor = <LudoColor, List<({LudoPlayer player, LudoToken token})>>{};
+      for (final item in items) {
+        byColor.putIfAbsent(item.player.color, () => []).add(item);
+      }
 
-      final isMovable = state.currentPlayer.color == movableItem.player.color &&
-          state.movableTokenIds.contains(movableItem.token.id);
+      final colorGroups = byColor.entries.toList();
+      final offsets = _offsetsForCount(colorGroups.length);
+      final tokenSize = _tokenSizeForCount(colorGroups.length, cellSize);
 
-      final tokenSize = cellSize * 0.85;
+      for (var i = 0; i < colorGroups.length; i++) {
+        final group = colorGroups[i].value;
+        final color = colorGroups[i].key;
+        final offset = offsets[i];
 
-      widgets.add(
-        Positioned(
-          left: coord.col * cellSize + (cellSize - tokenSize) / 2,
-          top: coord.row * cellSize + (cellSize - tokenSize) / 2,
-          child: LudoTokenWidget(
-            color: movableItem.player.color,
-            isMovable: isMovable,
-            count: items.length,
-            size: tokenSize,
-            onTap: () => onTokenSelected?.call(movableItem.token.id),
+        final movableItem = group.firstWhere(
+          (it) =>
+              it.player.color == state.currentPlayer.color &&
+              state.movableTokenIds.contains(it.token.id),
+          orElse: () => group.first,
+        );
+
+        final isMovable = state.currentPlayer.color == movableItem.player.color &&
+            state.movableTokenIds.contains(movableItem.token.id);
+
+        widgets.add(
+          Positioned(
+            left: coord.col * cellSize +
+                cellSize / 2 -
+                tokenSize / 2 +
+                offset.dx * cellSize,
+            top: coord.row * cellSize +
+                cellSize / 2 -
+                tokenSize / 2 +
+                offset.dy * cellSize,
+            child: LudoTokenWidget(
+              key: ValueKey(
+                group
+                    .map((it) => '${it.player.color.name}:${it.token.id}')
+                    .join(','),
+              ),
+              color: color,
+              isMovable: isMovable,
+              count: group.length,
+              size: tokenSize,
+              counterRotate: rotationQuarterTurns % 4 == 2,
+              onTap: () => onTokenSelected?.call(movableItem.token.id),
+            ),
           ),
-        ),
-      );
+        );
+      }
     });
 
     return widgets;
   }
+
+  List<Offset> _offsetsForCount(int count) {
+    switch (count) {
+      case 2:
+        return const [Offset(-0.24, 0), Offset(0.24, 0)];
+      case 3:
+        return const [
+          Offset(0, -0.22),
+          Offset(-0.22, 0.18),
+          Offset(0.22, 0.18),
+        ];
+      case 4:
+      default:
+        if (count <= 1) return const [Offset.zero];
+        return const [
+          Offset(-0.2, -0.2),
+          Offset(0.2, -0.2),
+          Offset(-0.2, 0.2),
+          Offset(0.2, 0.2),
+        ];
+    }
+  }
+
+  double _tokenSizeForCount(int count, double cellSize) {
+    if (count <= 1) return cellSize * 0.9;
+    if (count == 2) return cellSize * 0.62;
+    if (count == 3) return cellSize * 0.54;
+    return cellSize * 0.48;
+  }
+}
+
+class _LudoMotionLayer extends StatefulWidget {
+  final LudoMotion motion;
+  final double cellSize;
+  final VoidCallback onCompleted;
+  final VoidCallback? onStep;
+
+  const _LudoMotionLayer({
+    super.key,
+    required this.motion,
+    required this.cellSize,
+    required this.onCompleted,
+    this.onStep,
+  });
+
+  @override
+  State<_LudoMotionLayer> createState() => _LudoMotionLayerState();
+}
+
+class _LudoMotionLayerState extends State<_LudoMotionLayer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final int _segments;
+  int _lastSegment = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _segments = math.max(1, widget.motion.path.length - 1);
+    final duration = widget.motion.isYardExit
+        ? 480
+        : widget.motion.stepDurationMs * _segments;
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: duration),
+    );
+
+    _controller.addListener(_handleTick);
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          widget.onCompleted();
+        });
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  void _handleTick() {
+    final segment =
+        (_controller.value * _segments).floor().clamp(0, _segments);
+    if (segment > _lastSegment) {
+      _lastSegment = segment;
+      widget.onStep?.call();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cellSize = widget.cellSize;
+    final tokenSize = cellSize * 0.92;
+    final color = widget.motion.color.primaryColor;
+
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final raw = _controller.value * _segments;
+          final segment = raw.floor().clamp(0, _segments - 1);
+          final t = (raw - segment).clamp(0.0, 1.0);
+          final smoothT = Curves.easeInOutCubic.transform(t);
+          final from = widget.motion.path[segment];
+          final to = widget.motion.path[segment + 1];
+
+          final col = from.col + (to.col - from.col) * smoothT;
+          final row = from.row + (to.row - from.row) * smoothT;
+          final hop = math.sin(math.pi * smoothT) *
+              (widget.motion.isYardExit ? cellSize * 0.82 : cellSize * 0.04);
+
+          final left = col * cellSize + (cellSize - tokenSize) / 2;
+          final top = row * cellSize + (cellSize - tokenSize) / 2 - hop;
+
+          final scale = widget.motion.isYardExit
+              ? 0.6 + 0.4 * Curves.easeOutCubic.transform(t)
+              : 1.0 + math.sin(math.pi * smoothT) * 0.045;
+
+          final isLastSegment = segment >= _segments - 1;
+          final burstOpacity = isLastSegment && smoothT > 0.45
+              ? ((smoothT - 0.45) / 0.55).clamp(0.0, 1.0)
+              : 0.0;
+
+          return Stack(
+            children: [
+              Positioned(
+                left: left,
+                top: top,
+                child: Transform.rotate(
+                  angle: math.sin(math.pi * smoothT) * 0.025,
+                  child: Transform.scale(
+                    scale: scale,
+                    child: Container(
+                      width: tokenSize,
+                      height: tokenSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(
+                          color: color,
+                          width: tokenSize * 0.17,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.55),
+                            blurRadius: 14,
+                            spreadRadius: 3,
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: tokenSize * 0.44,
+                          height: tokenSize * 0.44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: widget.motion.color.gradientColors,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (burstOpacity > 0 &&
+                  (widget.motion.reachedHome ||
+                      widget.motion.capturedTokens.isNotEmpty))
+                Positioned(
+                  left: to.col * cellSize - cellSize * 0.2,
+                  top: to.row * cellSize - cellSize * 0.35,
+                  child: Opacity(
+                    opacity: burstOpacity,
+                    child: Transform.scale(
+                      scale: 0.7 + burstOpacity * 0.6,
+                      child: Text(
+                        widget.motion.capturedTokens.isNotEmpty ? '💥' : '✨',
+                        style: TextStyle(fontSize: cellSize * 1.05),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _LudoBoardPainter extends CustomPainter {
+  final int rotationQuarterTurns;
+
+  _LudoBoardPainter({this.rotationQuarterTurns = 0});
+
   @override
   void paint(Canvas canvas, Size size) {
     final cellSize = size.width / 15.0;
 
-    // 1. Draw Grid Cells
     final borderPaint = Paint()
       ..color = const Color(0xFFE2E8F0)
       ..style = PaintingStyle.stroke
@@ -127,7 +387,6 @@ class _LudoBoardPainter extends CustomPainter {
 
     for (var r = 0; r < 15; r++) {
       for (var c = 0; c < 15; c++) {
-        // Skip yards and center
         final inRedYard = r < 6 && c < 6;
         final inGreenYard = r < 6 && c >= 9;
         final inBlueYard = r >= 9 && c < 6;
@@ -138,14 +397,20 @@ class _LudoBoardPainter extends CustomPainter {
           continue;
         }
 
-        final rect = Rect.fromLTWH(c * cellSize, r * cellSize, cellSize, cellSize);
+        final rect =
+            Rect.fromLTWH(c * cellSize, r * cellSize, cellSize, cellSize);
 
-        // Check if colored home stretch
         Color? fillColor;
         if (r == 7 && c >= 1 && c <= 5) fillColor = LudoColor.red.primaryColor;
-        if (c == 7 && r >= 1 && r <= 5) fillColor = LudoColor.green.primaryColor;
-        if (c == 7 && r >= 9 && r <= 13) fillColor = LudoColor.blue.primaryColor;
-        if (r == 7 && c >= 9 && c <= 13) fillColor = LudoColor.yellow.primaryColor;
+        if (c == 7 && r >= 1 && r <= 5) {
+          fillColor = LudoColor.green.primaryColor;
+        }
+        if (c == 7 && r >= 9 && r <= 13) {
+          fillColor = LudoColor.blue.primaryColor;
+        }
+        if (r == 7 && c >= 9 && c <= 13) {
+          fillColor = LudoColor.yellow.primaryColor;
+        }
 
         if (fillColor != null) {
           canvas.drawRect(rect, Paint()..color = fillColor);
@@ -157,7 +422,6 @@ class _LudoBoardPainter extends CustomPainter {
       }
     }
 
-    // 2. Draw Yards
     _drawYard(
       canvas: canvas,
       rect: Rect.fromLTWH(0, 0, 6 * cellSize, 6 * cellSize),
@@ -187,10 +451,7 @@ class _LudoBoardPainter extends CustomPainter {
       slots: LudoBoardPath.yardSlots[LudoColor.yellow]!,
     );
 
-    // 3. Draw Center Home Triangles (rows 6..8, cols 6..8)
     _drawCenterHome(canvas, cellSize);
-
-    // 4. Draw Start Arrows & Safe Stars
     _drawStartArrows(canvas, cellSize);
     _drawSafeStars(canvas, cellSize);
   }
@@ -202,13 +463,11 @@ class _LudoBoardPainter extends CustomPainter {
     required double cellSize,
     required List<LudoCoordinate> slots,
   }) {
-    // Outer colored quadrant
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, const Radius.circular(16)),
       Paint()..color = color,
     );
 
-    // Inner white container
     final innerPadding = cellSize * 0.8;
     final innerRect = rect.deflate(innerPadding);
     canvas.drawRRect(
@@ -216,7 +475,6 @@ class _LudoBoardPainter extends CustomPainter {
       Paint()..color = Colors.white,
     );
 
-    // 4 slot circles inside
     for (final slot in slots) {
       final cx = slot.col * cellSize + cellSize / 2;
       final cy = slot.row * cellSize + cellSize / 2;
@@ -248,7 +506,6 @@ class _LudoBoardPainter extends CustomPainter {
     final top = 6 * cellSize;
     final center = Offset(left + 1.5 * cellSize, top + 1.5 * cellSize);
 
-    // Red Left Triangle
     final redPath = Path()
       ..moveTo(left, top)
       ..lineTo(center.dx, center.dy)
@@ -256,7 +513,6 @@ class _LudoBoardPainter extends CustomPainter {
       ..close();
     canvas.drawPath(redPath, Paint()..color = LudoColor.red.primaryColor);
 
-    // Green Top Triangle
     final greenPath = Path()
       ..moveTo(left, top)
       ..lineTo(left + 3 * cellSize, top)
@@ -264,7 +520,6 @@ class _LudoBoardPainter extends CustomPainter {
       ..close();
     canvas.drawPath(greenPath, Paint()..color = LudoColor.green.primaryColor);
 
-    // Yellow Right Triangle
     final yellowPath = Path()
       ..moveTo(left + 3 * cellSize, top)
       ..lineTo(left + 3 * cellSize, top + 3 * cellSize)
@@ -272,7 +527,6 @@ class _LudoBoardPainter extends CustomPainter {
       ..close();
     canvas.drawPath(yellowPath, Paint()..color = LudoColor.yellow.primaryColor);
 
-    // Blue Bottom Triangle
     final bluePath = Path()
       ..moveTo(left, top + 3 * cellSize)
       ..lineTo(center.dx, center.dy)
@@ -280,7 +534,6 @@ class _LudoBoardPainter extends CustomPainter {
       ..close();
     canvas.drawPath(bluePath, Paint()..color = LudoColor.blue.primaryColor);
 
-    // Center circular badge with number 8 / logo as in mockup
     canvas.drawCircle(center, cellSize * 0.65, Paint()..color = Colors.white);
     canvas.drawCircle(
       center,
@@ -303,14 +556,24 @@ class _LudoBoardPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    textPainter.paint(
-      canvas,
-      Offset(center.dx - textPainter.width / 2, center.dy - textPainter.height / 2),
+    final textOffset = Offset(
+      center.dx - textPainter.width / 2,
+      center.dy - textPainter.height / 2,
     );
+
+    if (rotationQuarterTurns % 4 == 2) {
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(math.pi);
+      canvas.translate(-center.dx, -center.dy);
+      textPainter.paint(canvas, textOffset);
+      canvas.restore();
+    } else {
+      textPainter.paint(canvas, textOffset);
+    }
   }
 
   void _drawStartArrows(Canvas canvas, double cellSize) {
-    // Red Start (6, 1) -> Arrow pointing right
     _drawArrowIcon(
       canvas,
       const LudoCoordinate(6, 1),
@@ -318,8 +581,6 @@ class _LudoBoardPainter extends CustomPainter {
       LudoColor.red.primaryColor,
       Icons.arrow_forward_rounded,
     );
-
-    // Green Start (1, 8) -> Arrow pointing down
     _drawArrowIcon(
       canvas,
       const LudoCoordinate(1, 8),
@@ -327,8 +588,6 @@ class _LudoBoardPainter extends CustomPainter {
       LudoColor.green.primaryColor,
       Icons.arrow_downward_rounded,
     );
-
-    // Yellow Start (8, 13) -> Arrow pointing left
     _drawArrowIcon(
       canvas,
       const LudoCoordinate(8, 13),
@@ -336,8 +595,6 @@ class _LudoBoardPainter extends CustomPainter {
       LudoColor.yellow.primaryColor,
       Icons.arrow_back_rounded,
     );
-
-    // Blue Start (13, 6) -> Arrow pointing up
     _drawArrowIcon(
       canvas,
       const LudoCoordinate(13, 6),
@@ -389,7 +646,6 @@ class _LudoBoardPainter extends CustomPainter {
       final cx = coord.col * cellSize + cellSize / 2;
       final cy = coord.row * cellSize + cellSize / 2;
 
-      // Draw subtle circular disc behind star
       canvas.drawCircle(
         Offset(cx, cy),
         cellSize * 0.38,
@@ -418,5 +674,7 @@ class _LudoBoardPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _LudoBoardPainter oldDelegate) {
+    return oldDelegate.rotationQuarterTurns != rotationQuarterTurns;
+  }
 }

@@ -41,82 +41,26 @@ class LudoEngine {
     String? player1Avatar,
     String? player2Name,
     String? player2Avatar,
-    String? player3Name,
-    String? player4Name,
   }) {
     final List<LudoPlayer> players;
 
-    switch (mode) {
-      case LudoGameMode.offline2:
-      case LudoGameMode.onlineCouple:
-        // 2 players: Green (Top) vs Blue (Bottom) as in the screenshot
-        players = [
-          LudoPlayer.initial(
-            id: 'p1',
-            name: player1Name,
-            color: LudoColor.green,
-            avatarUrl: player1Avatar,
-            isHost: true,
-          ),
-          LudoPlayer.initial(
-            id: 'p2',
-            name: player2Name ?? 'Pemain 2',
-            color: LudoColor.blue,
-            avatarUrl: player2Avatar,
-            isHost: false,
-          ),
-        ];
-        break;
-
-      case LudoGameMode.offline3:
-        players = [
-          LudoPlayer.initial(
-            id: 'p1',
-            name: player1Name,
-            color: LudoColor.red,
-            avatarUrl: player1Avatar,
-            isHost: true,
-          ),
-          LudoPlayer.initial(
-            id: 'p2',
-            name: player2Name ?? 'Pemain 2',
-            color: LudoColor.green,
-          ),
-          LudoPlayer.initial(
-            id: 'p3',
-            name: player3Name ?? 'Pemain 3',
-            color: LudoColor.yellow,
-          ),
-        ];
-        break;
-
-      case LudoGameMode.offline4:
-        players = [
-          LudoPlayer.initial(
-            id: 'p1',
-            name: player1Name,
-            color: LudoColor.red,
-            avatarUrl: player1Avatar,
-            isHost: true,
-          ),
-          LudoPlayer.initial(
-            id: 'p2',
-            name: player2Name ?? 'Pemain 2',
-            color: LudoColor.green,
-          ),
-          LudoPlayer.initial(
-            id: 'p3',
-            name: player3Name ?? 'Pemain 3',
-            color: LudoColor.blue,
-          ),
-          LudoPlayer.initial(
-            id: 'p4',
-            name: player4Name ?? 'Pemain 4',
-            color: LudoColor.yellow,
-          ),
-        ];
-        break;
-    }
+    // Ludo is always a couple game: Green (top) vs Blue (bottom).
+    players = [
+      LudoPlayer.initial(
+        id: 'p1',
+        name: player1Name,
+        color: LudoColor.green,
+        avatarUrl: player1Avatar,
+        isHost: true,
+      ),
+      LudoPlayer.initial(
+        id: 'p2',
+        name: player2Name ?? 'Pemain 2',
+        color: LudoColor.blue,
+        avatarUrl: player2Avatar,
+        isHost: false,
+      ),
+    ];
 
     return LudoGameState(
       mode: mode,
@@ -182,6 +126,7 @@ class LudoEngine {
       return state.copyWith(
         players: updatedPlayers,
         diceValue: diceRoll,
+        lastRolledByIndex: state.currentTurnIndex,
         currentTurnIndex: nextTurnIndex,
         phase: LudoTurnPhase.waitingForRoll,
         clearDice: true,
@@ -206,6 +151,7 @@ class LudoEngine {
       return state.copyWith(
         players: updatedPlayers,
         diceValue: diceRoll,
+        lastRolledByIndex: state.currentTurnIndex,
         currentTurnIndex: nextTurnIndex,
         phase: LudoTurnPhase.waitingForRoll,
         movableTokenIds: const [],
@@ -222,6 +168,7 @@ class LudoEngine {
     return state.copyWith(
       players: updatedPlayers,
       diceValue: diceRoll,
+      lastRolledByIndex: state.currentTurnIndex,
       phase: LudoTurnPhase.waitingForTokenMove,
       movableTokenIds: movableIds,
       statusMessage: movableIds.length == 1

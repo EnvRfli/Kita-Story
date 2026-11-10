@@ -21,7 +21,6 @@ import '../../credentials/widgets/pin_auth_bottom_sheet.dart';
 import '../../toilet/providers/toilet_provider.dart';
 import '../../cycle/providers/cycle_provider.dart';
 import '../../cycle/utils/cycle_role.dart';
-import '../../cycle/widgets/cycle_home_banner.dart';
 
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
@@ -463,13 +462,6 @@ class _HomeScreenState extends State<HomeScreen>
       me: cycleAuth.currentUserProfile,
       partner: cycleAuth.partnerProfile,
     );
-    final cycleUserId = cycleRole == CycleRole.owner
-        ? cycleAuth.currentUserProfile?.id
-        : (cycleRole == CycleRole.monitor
-            ? cycleAuth.partnerProfile?.id
-            : null);
-    final cycleSummary =
-        context.watch<CycleProvider>().dataFor(cycleUserId)?.summary;
 
     return Stack(
       fit: StackFit.expand,
@@ -581,16 +573,6 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                   const SizedBox(height: 28),
 
-                  if (cycleRole != CycleRole.hidden) ...[
-                    CycleHomeBanner(
-                      role: cycleRole,
-                      partnerName: cycleAuth.partnerProfile?.name,
-                      summary: cycleSummary,
-                      onTap: () => _navigateTo('/cycle'),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-
                   // Menu Section Title & Grid (with Entrance Animation)
                   FadeTransition(
                     opacity: menuAnim,
@@ -614,7 +596,7 @@ class _HomeScreenState extends State<HomeScreen>
                           const SizedBox(height: 16),
 
                           // 2-Column Menu Grid with Wavy Cards
-                          _buildMenuGrid(context),
+                          _buildMenuGrid(context, cycleRole),
                         ],
                       ),
                     ),
@@ -1402,7 +1384,7 @@ class _HomeScreenState extends State<HomeScreen>
   // ==========================================
   // WIDGET: 2-COLUMN MENU GRID (Wavy Interactive Cards)
   // ==========================================
-  Widget _buildMenuGrid(BuildContext context) {
+  Widget _buildMenuGrid(BuildContext context, CycleRole cycleRole) {
     return Column(
       children: [
         Row(
@@ -1550,21 +1532,50 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: WavyMenuCard(
-                title: 'Riwayat',
-                imagePath:
-                    'lib/assets/homescreen assets/386ff72a-ca85-47aa-9eeb-f38d9ab4c154 2.png',
-                imageRight: -20,
-                imageTop: null,
-                imageBottom: -15,
-                imageWidth: 110,
-                waveColor: const Color(0xFF6366F1),
-                onTap: () => _navigateTo('/history'),
-              ),
+              child: cycleRole != CycleRole.hidden
+                  ? _buildCycleMenuCard()
+                  : _buildHistoryMenuCard(),
             ),
           ],
         ),
+        if (cycleRole != CycleRole.hidden) ...[
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _buildHistoryMenuCard()),
+              const SizedBox(width: 14),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildCycleMenuCard() {
+    return WavyMenuCard(
+      title: 'Siklus',
+      imagePath: 'lib/assets/homescreen assets/cycle.png',
+      imageRight: -12,
+      imageTop: null,
+      imageBottom: -10,
+      imageWidth: 96,
+      waveColor: const Color(0xFFE11D48),
+      onTap: () => _navigateTo('/cycle'),
+    );
+  }
+
+  Widget _buildHistoryMenuCard() {
+    return WavyMenuCard(
+      title: 'Riwayat',
+      imagePath:
+          'lib/assets/homescreen assets/386ff72a-ca85-47aa-9eeb-f38d9ab4c154 2.png',
+      imageRight: -20,
+      imageTop: null,
+      imageBottom: -15,
+      imageWidth: 110,
+      waveColor: const Color(0xFF6366F1),
+      onTap: () => _navigateTo('/history'),
     );
   }
 

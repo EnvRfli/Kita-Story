@@ -8,7 +8,6 @@ import '../../../../core/widgets/gradient_avatar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../cycle/providers/cycle_provider.dart';
 import '../../cycle/utils/cycle_role.dart';
-import '../../cycle/widgets/cycle_home_banner.dart';
 
 class PartnerHomeScreen extends StatefulWidget {
   const PartnerHomeScreen({super.key});
@@ -421,26 +420,6 @@ class _PartnerHomeScreenState extends State<PartnerHomeScreen> {
                   ),
                   const SizedBox(height: 36),
 
-                  if (CycleAccess.resolveForPartner(partner: partnerUser) !=
-                      CycleRole.hidden) ...[
-                    CycleHomeBanner(
-                      role: CycleRole.monitor,
-                      partnerName: partnerName,
-                      summary: context
-                          .watch<CycleProvider>()
-                          .dataFor(partnerUser?.id)
-                          ?.summary,
-                      onTap: () => context.push(
-                        '/partner-cycle',
-                        extra: {
-                          'partnerId': partnerUser?.id,
-                          'partnerName': partnerName,
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                  ],
-
                   // Section Title: "Jelajahi ✨"
                   const Text(
                     'Jelajahi ✨',
@@ -458,6 +437,10 @@ class _PartnerHomeScreenState extends State<PartnerHomeScreen> {
                     context,
                     partnerId: partnerUser?.id,
                     partnerName: partnerName,
+                    showCycle: CycleAccess.resolveForPartner(
+                          partner: partnerUser,
+                        ) ==
+                        CycleRole.monitor,
                   ),
                 ],
               ),
@@ -485,7 +468,32 @@ class _PartnerHomeScreenState extends State<PartnerHomeScreen> {
     BuildContext context, {
     String? partnerId,
     required String partnerName,
+    required bool showCycle,
   }) {
+    Widget historyCard() => _buildMenuCard(
+          title: 'Riwayat',
+          imagePath:
+              'lib/assets/homescreen assets/386ff72a-ca85-47aa-9eeb-f38d9ab4c154 2.png',
+          imageRight: -16,
+          imageTop: null,
+          imageBottom: -12,
+          imageWidth: 100,
+          onTap: () => context.push('/history'),
+        );
+
+    Widget cycleCard() => _buildMenuCard(
+          title: 'Siklus',
+          imagePath: 'lib/assets/homescreen assets/cycle.png',
+          imageRight: -12,
+          imageTop: null,
+          imageBottom: -10,
+          imageWidth: 96,
+          onTap: () => context.push(
+            '/partner-cycle',
+            extra: {'partnerId': partnerId, 'partnerName': partnerName},
+          ),
+        );
+
     return Column(
       children: [
         // Row 1: Bacaan & Catatan
@@ -653,19 +661,20 @@ class _PartnerHomeScreenState extends State<PartnerHomeScreen> {
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: _buildMenuCard(
-                title: 'Riwayat',
-                imagePath:
-                    'lib/assets/homescreen assets/386ff72a-ca85-47aa-9eeb-f38d9ab4c154 2.png',
-                imageRight: -16,
-                imageTop: null,
-                imageBottom: -12,
-                imageWidth: 100,
-                onTap: () => context.push('/history'),
-              ),
+              child: showCycle ? cycleCard() : historyCard(),
             ),
           ],
         ),
+        if (showCycle) ...[
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: historyCard()),
+              const SizedBox(width: 14),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
+        ],
       ],
     );
   }

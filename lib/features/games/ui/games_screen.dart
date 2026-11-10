@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kita_story/features/games/2048/ui/game_2048_start_screen.dart';
-import 'package:kita_story/features/games/ludo/ui/ludo_start_screen.dart';
 import 'package:kita_story/features/games/sudoku/ui/sudoku_start_screen.dart';
 
 class _GameItem {
@@ -263,8 +262,13 @@ class GamesScreen extends StatelessWidget {
                       // Back Button (Rounded translucent square)
                       InkWell(
                         onTap: () {
-                          if (context.canPop()) {
+                          final router = GoRouter.maybeOf(context);
+                          if (router != null && router.canPop()) {
                             context.pop();
+                          } else if (router != null) {
+                            context.go('/home');
+                          } else {
+                            Navigator.of(context).maybePop();
                           }
                         },
                         borderRadius: BorderRadius.circular(12),
@@ -329,11 +333,7 @@ class GamesScreen extends StatelessWidget {
                               ),
                             );
                           } else if (game.title == 'Ludo') {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const LudoStartScreen(),
-                              ),
-                            );
+                            context.push('/ludo');
                           } else {
                             _showDevelopmentDialog(context, game);
                           }
