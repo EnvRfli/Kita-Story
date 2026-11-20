@@ -59,6 +59,16 @@ class LudoRepository {
       }
     }
 
+    // A newer Ludo invitation supersedes older pending invites across games.
+    try {
+      await _client.rpc('game_supersede_pending_invites', params: {
+        'p_user_a': hostId,
+        'p_user_b': guestId,
+      });
+    } catch (e) {
+      debugPrint('Warning: failed to supersede pending invites: $e');
+    }
+
     final now = DateTime.now().toUtc();
     final payload = {
       'host_id': hostId,

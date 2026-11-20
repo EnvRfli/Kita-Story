@@ -39,6 +39,18 @@ Dokumen ini menjelaskan arsitektur gamifikasi, sistem pencatatan aktivitas (*Act
 | **Catatan** | Centang Item Checklist | `check_note_item` | **`+1`** | `Checklist Selesai ☑️` | `Mencentang item checklist` |
 | **Profil** | Ganti Foto Profil | `update_avatar` | **`+5`** | `Ganti Foto Profil 🖼️` | `Memperbarui foto profil akun` |
 
+### 🎮 Poin Game
+
+| Game | Aktivitas | `activity_type` | Poin | Catatan |
+| :--- | :--- | :--- | :---: | :--- |
+| **Sudoku** | Menyelesaikan puzzle | `play_sudoku` | **`+10` s/d `+100`** | Berdasarkan difficulty; `sangat mudah` = 0 untuk testing |
+| **2048** | Mencapai milestone ubin | `play_2048` | **`+1` s/d `+25` per ubin** | Diakumulasi saat run selesai, maks +61 per game |
+| **Ludo** | Menang / selesai | `play_ludo` | **`+15` / `+5`** | Idempotent per `match_id` |
+| **Uno** | Menang / selesai | `play_uno` | **`+15` / `+5`** | Idempotent per match |
+| **Tetris** | Achievement garis | `game_tetris_milestone` | **`+2` / `+3` / `+5` / `+10` / `+15` / `+15`** | Sekali per akun untuk 10/25/50/100/150/200 garis, total maks +50 |
+
+Poin Tetris diklaim lewat RPC `claim_tetris_milestone` agar idempotent dan tidak bisa di-farm berulang. Skor, garis, dan level tetap disimpan di `game_history` untuk leaderboard pasangan.
+
 ---
 
 ## 🗄️ 3. Skema Database & RLS (Supabase)

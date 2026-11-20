@@ -44,6 +44,10 @@
 * **Poin Otomatis**: Setiap aktivitas produktif dan kolaboratif menghasilkan poin yang dicatat ke saldo pengguna dan log riwayat.
 * **Layar Riwayat Kronologis**: Riwayat seluruh aktivitas dengan pencarian lokal real-time dan ikon visual khusus per kategori.
 
+### 9. 🧩 Game Hub (`lib/features/games`)
+* **Tetris Classic Modern**: Papan 10×20 dengan 7-bag randomizer, next preview, ghost piece, pause, resume lokal, papan skor pasangan, dan achievement garis sekali per akun (maksimal +50 poin).
+* **Sudoku, 2048, Ludo, Uno**: Game lain tetap tersedia dengan leaderboard dan gamifikasinya masing-masing.
+
 ---
 
 ## 🛠️ Tech Stack & Dependencies
@@ -80,6 +84,9 @@ lib/
 │   ├── profile/            # Pengaturan Profil & Avatar Cropper
 │   ├── recipes/            # Resep Masakan & Detail
 │   ├── reminders/          # Pengingat & Notifikasi Berjenjang
+│   ├── toilet/             # Poop Tracker Bersama & GPS
+│   ├── cycle/              # Siklus Haid, Fase, Insight & Streak
+│   ├── games/              # Sudoku, 2048, Tetris, Ludo, Uno
 │   └── vacations/          # Liburan & Timeline Itinerary
 ```
 

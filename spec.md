@@ -98,6 +98,15 @@
 * **Notifikasi insight harian 07:00:** 3 insight per fase untuk owner dan 3 untuk monitor (plus 3 insight khusus terlambat per peran). Teks berotasi tiap 3 hari dan body selalu memuat hari/fase/kountdown sehingga setiap hari berbeda. Jadwal di-*hard-reset* dan ditulis ulang 14 hari ke depan setiap data siklus dimuat/diubah (`cycle_insight`, ID `910001..910014`).
 * **Gamifikasi:** +3 poin untuk catatan baru per hari, bonus streak sekali per milestone (+5 untuk 3 hari, +10 untuk 7 hari, +20 untuk 14 hari) dengan dedupe lewat `user_point_logs`, serta kartu streak 7 hari di layar siklus.
 
+### L. Game Hub & Tetris Classic Modern (`lib/features/games`)
+* **Game Hub:** Menampilkan kartu Sudoku, 2048, Tetris, Ludo, Uno, serta placeholder Nonogram, Minesweeper, dan Ular Tangga. Game single-player membuka start screen sendiri; game pasangan memakai GoRouter + realtime.
+* **Tetris Classic Modern:**
+  * Papan 10×20, 7-bag randomizer, next preview 3 piece, ghost piece, wall kick sederhana, lock delay ±500 ms, dan pause/auto-pause.
+  * Skor klasik: 100/300/500/800 × level untuk 1–4 garis, soft drop +1/baris, hard drop +2/baris. Level naik setiap 10 garis.
+  * Kontrol tombol besar (kiri, putar, kanan, turun, drop, jeda) + gesture papan (tap putar, drag geser/turun). Mendukung resume lokal dan exit flow `Lanjut Bermain / Simpan & Keluar / Akhiri Permainan`.
+  * **Achievement garis (sekali per akun):** 10 garis `+2`, 25 garis `+3`, 50 garis `+5`, 100 garis `+10`, 150 garis `+15`, 200 garis `+15` — total maksimal **+50 poin**. Klaim lewat RPC `claim_tetris_milestone` dan tabel `game_achievements`.
+  * Leaderboard pasangan: skor tertinggi per user, tie-breaker garis → level → durasi lebih pendek → tanggal lebih awal. Hasil disimpan di `game_history` dengan `game_type = 'tetris'`, `lines_cleared`, dan `level_reached`.
+
 ---
 
 ## 3. Technical Stack & Architecture
@@ -128,6 +137,7 @@ lib/
 │   ├── books/              # Library, Progres, Karakter, Snippet, Notes
 │   ├── credentials/        # Brankas Kredensial, Dynamic Fields, AES-256, PIN Auth Bottom Sheet
 │   ├── finances/           # Keuangan, Saldo, Donut Chart, Transaksi, Form & Detail
+│   ├── games/              # Sudoku, 2048, Tetris, Ludo, Uno
 │   ├── history/            # Riwayat & Log Aktivitas Pengguna
 │   ├── home/               # Dashboard Utama & Partner Profile Home
 │   ├── notes/              # Catatan Pribadi & Bersama, Checklist, Format Helper, Import/Export
@@ -136,6 +146,7 @@ lib/
 │   ├── reminders/          # Pengingat, Notifikasi Berjenjang, & Agenda
 │   ├── toilet/             # Poop Tracker Bersama, GPS & Manual Location, Digestive Status & Insight
 │   ├── cycle/              # Siklus Haid, Fase & Kalender, Insight 07:00, Streak & Bonus Poin
+│   ├── games/tetris/       # Tetris Classic Modern, Snapshot Lokal, Achievement & Leaderboard
 │   └── vacations/          # Liburan, Kalender, & Itinerary Kegiatan
 ```
 
@@ -175,6 +186,12 @@ lib/
 | **Siklus** | Streak 3 Hari | `cycle_streak_3` | **`+5`** | `Streak 3 Hari 🔥` | `Mencatat siklus 3 hari berturut-turut` |
 | **Siklus** | Streak 7 Hari | `cycle_streak_7` | **`+10`** | `Streak 7 Hari 🔥` | `Mencatat siklus 7 hari berturut-turut` |
 | **Siklus** | Streak 14 Hari | `cycle_streak_14` | **`+20`** | `Streak 14 Hari 🔥` | `Mencatat siklus 14 hari berturut-turut` |
+| **Tetris** | Achievement 10 Garis | `game_tetris_milestone` | **`+2`** | `Achievement Tetris 10 Garis 🧩` | `Berhasil menghapus 10 garis di Tetris (+2 poin)` |
+| **Tetris** | Achievement 25 Garis | `game_tetris_milestone` | **`+3`** | `Achievement Tetris 25 Garis 🧩` | `Berhasil menghapus 25 garis di Tetris (+3 poin)` |
+| **Tetris** | Achievement 50 Garis | `game_tetris_milestone` | **`+5`** | `Achievement Tetris 50 Garis 🧩` | `Berhasil menghapus 50 garis di Tetris (+5 poin)` |
+| **Tetris** | Achievement 100 Garis | `game_tetris_milestone` | **`+10`** | `Achievement Tetris 100 Garis 🧩` | `Berhasil menghapus 100 garis di Tetris (+10 poin)` |
+| **Tetris** | Achievement 150 Garis | `game_tetris_milestone` | **`+15`** | `Achievement Tetris 150 Garis 🧩` | `Berhasil menghapus 150 garis di Tetris (+15 poin)` |
+| **Tetris** | Achievement 200 Garis | `game_tetris_milestone` | **`+15`** | `Achievement Tetris 200 Garis 🧩` | `Berhasil menghapus 200 garis di Tetris (+15 poin)` |
 | **Profil** | Ganti Foto Profil | `update_avatar` | **`+5`** | `Ganti Foto Profil 🖼️` | `Memperbarui foto profil akun` |
 
 ---
@@ -493,4 +510,26 @@ CREATE TABLE IF NOT EXISTS public.cycle_day_logs (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (user_id, log_date)
 );
+
+-- 12. Game History & Achievements (Sudoku, 2048, Tetris, Ludo, Uno)
+ALTER TABLE public.game_history
+  ADD COLUMN IF NOT EXISTS highest_tile INTEGER,
+  ADD COLUMN IF NOT EXISTS moves_count INTEGER,
+  ADD COLUMN IF NOT EXISTS lines_cleared INTEGER,
+  ADD COLUMN IF NOT EXISTS level_reached INTEGER;
+
+CREATE TABLE IF NOT EXISTS public.game_achievements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  game_type TEXT NOT NULL,
+  milestone INTEGER NOT NULL CHECK (milestone > 0),
+  points_awarded INTEGER NOT NULL CHECK (points_awarded >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, game_type, milestone)
+);
+
+-- RPC Tetris (SECURITY DEFINER):
+-- claim_tetris_milestone(p_milestone INTEGER) -> BOOLEAN
+-- Memvalidasi milestone 10/25/50/100/150/200, menulis game_achievements,
+-- menambah app_users.points, dan mencatat user_point_logs secara atomik.
 ```

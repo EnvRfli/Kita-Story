@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kita_story/features/games/2048/ui/game_2048_start_screen.dart';
 import 'package:kita_story/features/games/sudoku/ui/sudoku_start_screen.dart';
+import 'package:kita_story/features/games/tetris/ui/tetris_start_screen.dart';
+import 'package:kita_story/features/games/tetris/widgets/tetris_artwork.dart';
 
 class _GameItem {
   final String title;
@@ -43,6 +45,13 @@ class GamesScreen extends StatelessWidget {
           'Geser dan gabungkan ubin dengan angka yang sama hingga mencapai ubin 2048 legendaris!',
     ),
     _GameItem(
+      title: 'Tetris',
+      assetPath: 'lib/assets/game screen/Frame 1984078794 (1).png',
+      gradientColors: [Color(0xFF7C3AED), Color(0xFF06B6D4)],
+      description:
+          'Susun balok warna-warni, hapus garis, dan raih skor tertinggi!',
+    ),
+    _GameItem(
       title: 'Minesweeper',
       assetPath: 'lib/assets/game screen/Frame 1984078794 (2).png',
       gradientColors: [Color(0xFFFF8177), Color(0xFFFF5677)],
@@ -62,6 +71,13 @@ class GamesScreen extends StatelessWidget {
       gradientColors: [Color(0xFF96E0F3), Color(0xFF6F82FF)],
       description:
           'Lempar dadu, naiki tangga kemenangan, dan hati-hati dengan jebakan ular licin!',
+    ),
+    _GameItem(
+      title: 'Uno',
+      assetPath: 'lib/assets/game screen/image 1.png',
+      gradientColors: [Color(0xFFE53935), Color(0xFFF9A825)],
+      description:
+          'Tumpuk kartu, balas draw, dan habiskan tangan duluan! Online bersama pasangan.',
     ),
   ];
 
@@ -112,17 +128,10 @@ class GamesScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: Image.asset(
-                      game.assetPath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.sports_esports_rounded,
-                        size: 38,
-                        color: Color(0xFF94A3B8),
-                      ),
-                    ),
+                  child: _GameThumbnail(
+                    item: game,
+                    size: 76,
+                    borderRadius: 18,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -332,8 +341,16 @@ class GamesScreen extends StatelessWidget {
                                 builder: (_) => const Game2048StartScreen(),
                               ),
                             );
+                          } else if (game.title == 'Tetris') {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const TetrisStartScreen(),
+                              ),
+                            );
                           } else if (game.title == 'Ludo') {
                             context.push('/ludo');
+                          } else if (game.title == 'Uno') {
+                            context.push('/uno');
                           } else {
                             _showDevelopmentDialog(context, game);
                           }
@@ -465,20 +482,10 @@ class _GameCardState extends State<_GameCard> {
                       ),
                     ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(19),
-                    child: Image.asset(
-                      item.assetPath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: Colors.white,
-                        child: const Icon(
-                          Icons.sports_esports_rounded,
-                          color: Color(0xFF64748B),
-                          size: 38,
-                        ),
-                      ),
-                    ),
+                  child: _GameThumbnail(
+                    item: item,
+                    size: 84,
+                    borderRadius: 19,
                   ),
                 ),
               ),
@@ -488,4 +495,130 @@ class _GameCardState extends State<_GameCard> {
       ),
     );
   }
+}
+
+class _GameThumbnail extends StatelessWidget {
+  final _GameItem item;
+  final double size;
+  final double borderRadius;
+
+  const _GameThumbnail({
+    required this.item,
+    required this.size,
+    required this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final child = item.title == 'Uno'
+        ? _UnoThumbnail(size: size)
+        : item.title == 'Tetris'
+            ? _TetrisThumbnail(size: size)
+            : Image.asset(
+                item.assetPath,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: Colors.white,
+                  child: const Icon(
+                    Icons.sports_esports_rounded,
+                    color: Color(0xFF64748B),
+                    size: 38,
+                  ),
+                ),
+              );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: child,
+    );
+  }
+}
+
+class _UnoThumbnail extends StatelessWidget {
+  final double size;
+
+  const _UnoThumbnail({required this.size});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFFFF8E1),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Transform.translate(
+            offset: Offset(-size * 0.08, size * 0.02),
+            child: Transform.rotate(
+              angle: -0.18,
+              child: Container(
+                width: size * 0.46,
+                height: size * 0.68,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E88E5),
+                  borderRadius: BorderRadius.circular(size * 0.07),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(size * 0.08, -size * 0.02),
+            child: Transform.rotate(
+              angle: 0.12,
+              child: Container(
+                width: size * 0.5,
+                height: size * 0.72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE53935),
+                  borderRadius: BorderRadius.circular(size * 0.08),
+                  border: Border.all(color: Colors.white, width: 2.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: size * 0.045,
+                      vertical: size * 0.02,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(size * 0.04),
+                    ),
+                    child: Text(
+                      'UNO',
+                      style: TextStyle(
+                        fontSize: size * 0.12,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFFE53935),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TetrisThumbnail extends StatelessWidget {
+  final double size;
+
+  const _TetrisThumbnail({required this.size});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        color: const Color(0xFFF5F3FF),
+        child: Center(
+          child: TetrisArtwork(size: size * 0.92),
+        ),
+      );
 }

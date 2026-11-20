@@ -39,6 +39,8 @@ import '../../features/cycle/ui/cycle_screen.dart';
 import '../../features/games/ui/games_screen.dart';
 import '../../features/games/ludo/ui/ludo_start_screen.dart';
 import '../../features/games/ludo/ui/ludo_game_screen.dart';
+import '../../features/games/uno/ui/uno_start_screen.dart';
+import '../../features/games/uno/ui/uno_game_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -358,6 +360,14 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/ludo/game',
       builder: (context, state) => const LudoGameScreen(),
+    ),
+    GoRoute(
+      path: '/uno',
+      builder: (context, state) => const UnoStartScreen(),
+    ),
+    GoRoute(
+      path: '/uno/game',
+      builder: (context, state) => const UnoGameScreen(),
     ),
     // --- TOILET / POOP TRACKER MODULE ---
     GoRoute(

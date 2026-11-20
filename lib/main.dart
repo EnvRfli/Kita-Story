@@ -20,6 +20,9 @@ import 'features/cycle/providers/cycle_provider.dart';
 import 'features/games/ludo/providers/ludo_game_provider.dart';
 import 'features/games/ludo/providers/ludo_invite_provider.dart';
 import 'features/games/ludo/widgets/ludo_global_notification_host.dart';
+import 'features/games/uno/providers/uno_game_provider.dart';
+import 'features/games/uno/providers/uno_invite_provider.dart';
+import 'features/games/uno/widgets/uno_global_notification_host.dart';
 
 import 'core/router/app_router.dart';
 import 'core/services/finance_widget_service.dart';
@@ -81,6 +84,8 @@ class KitaStoryApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CycleProvider()),
         ChangeNotifierProvider(create: (_) => LudoGameProvider()),
         ChangeNotifierProvider(create: (_) => LudoInviteProvider()),
+        ChangeNotifierProvider(create: (_) => UnoGameProvider()),
+        ChangeNotifierProvider(create: (_) => UnoInviteProvider()),
       ],
       child: MaterialApp.router(
         title: 'DayTale',
@@ -89,7 +94,9 @@ class KitaStoryApp extends StatelessWidget {
         routerConfig: appRouter,
         builder: (context, child) {
           return LudoGlobalNotificationHost(
-            child: child ?? const SizedBox(),
+            child: UnoGlobalNotificationHost(
+              child: child ?? const SizedBox(),
+            ),
           );
         },
       ),
